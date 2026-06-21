@@ -17,8 +17,7 @@ O pacote distribuído normalmente contém:
 
 Não mova o `.exe` para fora da pasta do pacote e não execute o aplicativo de dentro de um `.zip`.
 
-![Uploading image.png…]()
-
+<img width="859" height="545" alt="Screenshot 2026-06-21 130246" src="https://github.com/user-attachments/assets/6d662bee-0596-4f0f-b047-69e44a9bceda" />
 
 ## 2. Como o executável funciona
 
