@@ -17,6 +17,9 @@ O pacote distribuído normalmente contém:
 
 Não mova o `.exe` para fora da pasta do pacote e não execute o aplicativo de dentro de um `.zip`.
 
+![Uploading image.png…]()
+
+
 ## 2. Como o executável funciona
 
 Ao abrir `erbs_analyzer_server.exe`, o sistema:
