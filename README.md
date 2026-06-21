@@ -19,6 +19,10 @@ Não mova o `.exe` para fora da pasta do pacote e não execute o aplicativo de d
 
 <img width="859" height="545" alt="Screenshot 2026-06-21 130246" src="https://github.com/user-attachments/assets/6d662bee-0596-4f0f-b047-69e44a9bceda" />
 
+<img width="1600" height="808" alt="WhatsApp Image 2026-06-21 at 13 03 50" src="https://github.com/user-attachments/assets/e3965dc5-d541-485c-855c-98ca78650bb1" />
+
+
+
 ## 2. Como o executável funciona
 
 Ao abrir `erbs_analyzer_server.exe`, o sistema:
