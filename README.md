@@ -17,12 +17,6 @@ O pacote distribuído normalmente contém:
 
 Não mova o `.exe` para fora da pasta do pacote e não execute o aplicativo de dentro de um `.zip`.
 
-<img width="859" height="545" alt="Screenshot 2026-06-21 130246" src="https://github.com/user-attachments/assets/6d662bee-0596-4f0f-b047-69e44a9bceda" />
-
-<img width="1600" height="808" alt="WhatsApp Image 2026-06-21 at 13 03 50" src="https://github.com/user-attachments/assets/e3965dc5-d541-485c-855c-98ca78650bb1" />
-
-
-
 ## 2. Como o executável funciona
 
 Ao abrir `erbs_analyzer_server.exe`, o sistema:
@@ -58,7 +52,7 @@ As operações abaixo continuam locais e independem de um servidor remoto da apl
 - normalização e persistência de dados canônicos;
 - navegação entre módulos analíticos;
 - análises de Voz, Conexão, Avançado, Grafo, Correlação e Gantt;
-- exportações CSV, XLSX, KML, PDF e HTML;
+- exportações CSV, XLSX, KML, PDF, HTML e mapa interativo HTML;
 - leitura de POIs cadastrados manualmente por coordenada.
 
 ### 4.2. O que depende de internet
@@ -115,7 +109,7 @@ O uso padrão da ferramenta normalmente segue esta ordem:
 | Avançado | Reúne indicadores forenses como bursts, silêncios, burner, co-localização e roaming. | Para leitura de padrão, anomalia e risco. |
 | Grafo | Visualiza a rede de relacionamentos do caso. | Para cadeia de contato e clusters. |
 | Correlação | Cruza extratos por MSISDN, IMEI, CGI e overlap temporal. | Para confirmar convergência entre fontes. |
-| Exportações | Gera saídas CSV, XLSX, KML, PDF e HTML. | Para consolidação, auditoria e entrega. |
+| Exportações | Gera saídas CSV, XLSX, KML, PDF, HTML e mapa interativo HTML. | Para consolidação, auditoria e entrega. |
 | Base ERBs | Administra a base mestre de estações. | Para manutenção da infraestrutura cartográfica do sistema. |
 
 ## 6.2. Dashboard de casos
@@ -295,9 +289,12 @@ O módulo `Exportações` gera saídas para auditoria, compartilhamento ou entre
 - `all.xlsx`;
 - `markers.kml`;
 - `report.pdf`;
-- `report.html`.
+- `report.html`;
+- `map.html`.
 
 O `report.html` pode ser protegido por senha. Alguns formatos usam `MSISDN alvo` para enriquecer a análise.
+
+O `map.html` gera um mapa standalone interativo com Leaflet embutido, marcadores, heatmap, trajetória, POIs, timeline e playback temporal cumulativo. O arquivo funciona offline em qualquer navegador, sem necessidade de backend ou código.
 
 ## 6.16. Base ERBs
 
@@ -306,7 +303,7 @@ O módulo `Base ERBs` é usado para administrar a base mestre de estações. Ele
 - buscar por operadora, UF, cidade, bairro e estação;
 - editar registros;
 - criar registros manuais;
-- importar atualização por planilha;
+- importar atualização por planilha `.xlsx` ou arquivo `.csv`;
 - revisar staging e diff;
 - executar commit e rollback de versões;
 - consultar histórico da base.
