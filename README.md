@@ -4,6 +4,11 @@
 
 O `ERBs Analyzer` é uma aplicação local para análise técnico-investigativa de extratos telefônicos de telefonia móvel. O executável abre um servidor local na própria máquina e entrega a interface no navegador padrão.
 
+<img width="886" height="563" alt="image" src="https://github.com/user-attachments/assets/2475f104-45df-4cb6-9541-8c38f6e2e0a0" />
+
+<img width="1903" height="950" alt="image" src="https://github.com/user-attachments/assets/de33a525-08e9-4122-b0e4-edf5b7497dd4" />
+
+
 O processamento principal é local: casos, extratos importados, análises, correlações, grafos, exportações e configurações ficam na própria estação de trabalho.
 
 O pacote distribuído normalmente contém:
@@ -37,6 +42,7 @@ Locais mais importantes:
 - `data\cases`: casos, extratos importados, auditoria do caso e exportações.
 - `data\erb_db`: base mestre de ERBs usada pelos mapas e cruzamentos.
 - `data\config\app_settings.json`: configurações locais da instalação, inclusive Google Maps em runtime.
+- `data\config\admin_key`: credencial administrativa criada automaticamente no primeiro uso; não compartilhe este arquivo.
 - `data\audit\system.jsonl`: trilha de auditoria sistêmica de eventos administrativos e operacionais.
 
 Se você receber uma nova versão do executável, preserve a pasta `data` caso queira manter casos, base ERB e configurações já existentes.
@@ -81,7 +87,37 @@ Sem internet, o sistema pode continuar abrindo e processando os dados locais, ma
 3. Execute `erbs_analyzer_server.exe`.
 4. Aguarde a interface abrir no navegador.
 
-### 5.2. Fluxo operacional recomendado
+### 5.2. Chave de administrador (admin key)
+
+Na primeira execução, o sistema cria automaticamente um arquivo com a chave de administrador em:
+
+`data\config\admin_key`
+
+#### O que é essa chave
+
+É um segredo local que protege funções administrativas e sensíveis do sistema, como alterar a base mestre de ERBs, acessar configurações de APIs pagas (ex: Google Maps) e executar operações que podem afetar todos os casos da instalação.
+
+#### Por que ela é necessária
+
+A chave existe para evitar que qualquer pessoa com acesso ao navegador realize alterações destrutivas ou custosas. Como o executável sobe um servidor local na sua máquina, sem a chave de admin o acesso a funções protegidas fica bloqueado.
+
+#### É preciso colocar toda vez que abre o aplicativo?
+
+Não. A interface pede a chave apenas quando você tenta acessar uma área protegida. O navegador pode lembrar o valor durante a sessão, mas, por segurança, ele não fica salvo permanentemente no navegador. Se fechar o navegador ou limpar os dados, será necessário digitá-la novamente ao tentar uma ação protegida.
+
+A chave em si é salva no arquivo `data\config\admin_key` e permanece a mesma enquanto você preservar a pasta `data` da instalação.
+
+#### Onde conseguir a chave
+
+1. Abra a pasta do executável.
+2. Entre em `data\config`.
+3. Abra o arquivo `admin_key` com um editor de texto simples (Bloco de Notas, por exemplo).
+4. Copie o conteúdo do arquivo (é uma string longa de letras e números).
+5. Na interface do ERBs Analyzer, quando aparecer o campo de "Chave admin", cole esse valor.
+
+**Importante:** não compartilhe a pasta `data` nem o arquivo `admin_key` com terceiros, pois quem tiver acesso a esse arquivo poderá realizar alterações administrativas na instalação.
+
+### 5.3. Fluxo operacional recomendado
 
 O uso padrão da ferramenta normalmente segue esta ordem:
 
@@ -413,9 +449,9 @@ Proteja especialmente:
 - `data\audit\system.jsonl`, porque registra eventos operacionais;
 - exportações geradas para compartilhamento externo.
 
-### 8.3. Modo protegido opcional
+### 8.3. Modo protegido
 
-Se a instalação for configurada com chave administrativa, algumas operações sensíveis podem exigir credencial adicional. Nessa situação, o frontend oferece o painel `Acesso admin` para guardar a credencial apenas na sessão atual do navegador.
+No primeiro uso, a instalação cria `data\config\admin_key`. Operações sensíveis exigem essa credencial. O painel `Acesso admin` a guarda apenas na sessão atual do navegador. A chave Google salva no aplicativo fica cifrada no JSON de configuração.
 
 ### 8.4. Boas práticas de uso
 
