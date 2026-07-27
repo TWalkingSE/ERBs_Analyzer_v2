@@ -6,6 +6,10 @@ O `ERBs Analyzer` é uma aplicação local para análise técnico-investigativa 
 
 <img width="886" height="563" alt="image" src="https://github.com/user-attachments/assets/2475f104-45df-4cb6-9541-8c38f6e2e0a0" />
 
+
+<img width="874" height="822" alt="image" src="https://github.com/user-attachments/assets/35e706b6-013e-443d-9f62-b3cfdc52e3de" />
+
+
 <img width="1903" height="950" alt="image" src="https://github.com/user-attachments/assets/de33a525-08e9-4122-b0e4-edf5b7497dd4" />
 
 
