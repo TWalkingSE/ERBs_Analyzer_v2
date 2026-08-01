@@ -61,7 +61,7 @@ As operações abaixo continuam locais e independem de um servidor remoto da apl
 - importação de extratos `.xlsx`;
 - normalização e persistência de dados canônicos;
 - navegação entre módulos analíticos;
-- análises de Voz, Conexão, Avançado, Grafo, Correlação e Gantt;
+- análises de Telefones, dossiê do número, comparação entre números, Voz, Conexão, Grafo, Correlação e Gantt;
 - exportações CSV, XLSX, KML, PDF, HTML e mapa interativo HTML;
 - leitura de POIs cadastrados manualmente por coordenada.
 
@@ -128,7 +128,7 @@ O uso padrão da ferramenta normalmente segue esta ordem:
 1. criar ou abrir um caso;
 2. importar um ou mais extratos;
 3. validar o caso no `Mapa ERBs`;
-4. aprofundar em `Telefones`, `Voz`, `Conexão`, `Avançado`, `Gantt`, `Grafo` e `Correlação`;
+4. aprofundar em `Telefones` e no dossiê de cada número, `Voz`, `Conexão`, `Gantt`, `Grafo` e `Correlação`;
 5. gerar exportações quando a análise estiver madura.
 
 ## 6. Módulos e funções do sistema
@@ -143,10 +143,11 @@ O uso padrão da ferramenta normalmente segue esta ordem:
 | Mapa ERBs | Exibe eventos, heatmap, setores, cobertura, playback, breadcrumb, trajeto, geofence, corredor, permanência e POIs. | Leitura espacial principal do caso. |
 | Split-view | Compara dois extratos com enquadramento sincronizado. | Para confrontar fontes, períodos ou operadoras. |
 | Gantt | Organiza a linha do tempo por dia e horário. | Para leitura cronológica precisa. |
-| Telefones | Consolida qualidade de MSISDNs, DDDs, alertas e vínculos com IMEI. | Para saneamento e leitura de consistência dos números. |
+| Telefones | Inventário pesquisável de todos os números do caso, com apelidos, qualidade dos dados e sinais do caso inteiro. | Ponto de entrada para tudo que envolve números. |
+| Dossiê do número | Reúne, num recorte só, tudo o que o caso registra sobre um número. | Quando o foco é um número específico e o resultado vai para um relatório. |
+| Comparar números | Cruza dois números por contatos, lugares, rotina e contato direto. | Para testar se duas pessoas se conhecem, se encontram ou compartilham círculo. |
 | Voz | Analisa chamadas, contrapartes, ERBs, reciprocidade e sinais comportamentais. | Para relação social e dinâmica de chamadas. |
 | Conexão | Analisa sessões de dados, bytes, duração, IMEIs, IPs, CGIs e ERBs. | Para rastro técnico do uso de dados. |
-| Avançado | Reúne indicadores forenses como bursts, silêncios, burner, co-localização e roaming. | Para leitura de padrão, anomalia e risco. |
 | Grafo | Visualiza a rede de relacionamentos do caso. | Para cadeia de contato e clusters. |
 | Correlação | Cruza extratos por MSISDN, IMEI, CGI e overlap temporal. | Para confirmar convergência entre fontes. |
 | Exportações | Gera saídas CSV, XLSX, KML, PDF, HTML e mapa interativo HTML. | Para consolidação, auditoria e entrega. |
@@ -203,7 +204,7 @@ O `Mapa ERBs` é a principal tela de leitura espacial e temporal. Ele permite:
 - alternar entre modo `Agrupado` e `Sem agregação`;
 - visualizar marcadores táticos, heatmap, setores de azimute, cobertura estimada, playback, breadcrumb e trajeto;
 - filtrar por extrato, MSISDN, operadora, cidade, período e janela temporal;
-- ajustar o raio e a abertura do setor;
+- ajustar o setor: a abertura vem estimada por estação e o controle de raio é um multiplicador (x0.5 a x2) sobre o alcance que o sistema calcula para cada antena;
 - desenhar geofence e corredor;
 - consultar permanência por raio e duração;
 - destacar POIs e focar no contexto de um marcador analítico.
@@ -218,6 +219,26 @@ O `Mapa ERBs` é a principal tela de leitura espacial e temporal. Ele permite:
 - `Cobertura`: mostra círculos de alcance estimado.
 - `Geofence e corredor`: delimitam área e eixo de passagem.
 - `Permanência`: resume pontos com maior tempo de retenção.
+- `Melhor servidor`: divide o mapa pela antena mais próxima de cada ponto. É a candidata mais plausível, não a cobertura medida. Só no Leaflet.
+- `Cobertura da base`: diz quanta evidência ficou **fora** do mapa e quais CGIs a engoliram.
+
+### Área provável de presença
+
+Um evento sozinho diz "em algum lugar deste setor". Três eventos consecutivos em setores diferentes dizem "na interseção", que costuma ser muito menor — a diferença entre apontar um bairro e apontar uma quadra.
+
+O sistema cruza as cunhas de setor de eventos próximos no tempo e lista as janelas da **área menor para a maior**. Área pequena significa posição mais certa.
+
+Quando a interseção é mais fina do que a resolução do cálculo, a janela vem marcada como limitada pela resolução: a área mostrada é o **teto** que o método consegue afirmar, não uma medição.
+
+### Direção de deslocamento
+
+Rumo e velocidade entre estações consecutivas, com rosa dos ventos e direção dominante. O índice de consistência separa "foi de A para B" de "ficou indo e voltando".
+
+Trocar de setor dentro da mesma torre não conta como deslocamento.
+
+### Mudança de base
+
+Compara as estações dominantes antes e depois de uma data, separando em **surgidas**, **abandonadas** e **mantidas**. Responde se o alvo mudou de rotina, de endereço ou de cidade a partir daquele momento.
 
 ## 6.6. POIs
 
@@ -251,14 +272,15 @@ O `Gantt do alvo` organiza os eventos em uma linha do tempo por dia e horário. 
 
 ## 6.9. Telefones
 
-O painel `Telefones` consolida a qualidade dos identificadores do caso. Ele ajuda a revisar:
+O painel `Telefones` é o ponto de entrada para tudo que envolve números.
 
-- MSISDNs válidos e problemáticos;
-- DDDs faltantes ou inconsistentes;
-- alvos inferidos;
-- alertas de importação;
-- IMEIs compartilhados;
-- relações entre números e aparelhos.
+**Inventário** — todos os números do caso, não só os mais relevantes. Você pode buscar por número, apelido, vínculo ou UF; ordenar por relevância, volume, contatos, aparelhos ou período; e filtrar por recortes de triagem (alvos declarados, números com mais de um aparelho, números presentes em mais de um extrato, já identificados ou ainda sem identificação).
+
+**Identificação** — qualquer número pode ser batizado com apelido, vínculo, observação e cor. A partir daí o apelido aparece nas tabelas, no grafo, no Gantt, nos popups do mapa e nos arquivos exportados. O número cru continua ao lado, porque é ele que casa com o extrato oficial.
+
+**Qualidade dos dados** — MSISDNs válidos e problemáticos, DDDs faltantes ou inconsistentes, alvos inferidos, alertas de importação, IMEIs compartilhados, duplicatas entre extratos e relações entre números e aparelhos.
+
+**Sinais do caso** — achados que valem para a investigação inteira: trocas de aparelho, chips que passaram pelo mesmo aparelho, possíveis descartáveis e intermediários (quem está no caminho entre grupos que não se falam diretamente).
 
 ## 6.10. Voz
 
@@ -284,19 +306,25 @@ O módulo `Conexão` foca nas sessões de dados. Ele ajuda a responder perguntas
 - qual foi o volume de bytes e a duração das sessões;
 - em que janelas ocorreu o pico de atividade de dados.
 
-## 6.12. Avançado
+## 6.12. Dossiê do número e comparação
 
-O módulo `Avançado` concentra indicadores forenses comportamentais, como:
+### Dossiê do número
 
-- bursts;
-- silêncios;
-- burner indicators;
-- co-localização;
-- roaming;
-- swaps de IMEI;
-- swaps de chip;
-- velocidade impossível;
-- padrões auxiliares de risco e anomalia.
+Clicando em `Dossiê` em qualquer linha, você abre a ficha completa daquele número: contrapartes com duração média e mediana, separação entre SMS e voz, aparelhos, células e as estações físicas por trás delas, padrão semanal, picos de atividade, silêncios, redirecionamentos, coincidências de local, pernoite, afastamento da base, deslocamentos improváveis e pontos de interesse.
+
+Todos esses indicadores enxergam exatamente a mesma janela de tempo — o que importa quando o resultado vai para um relatório.
+
+Atenção à coluna `Torre` na tabela de células: três CGIs diferentes podem ser três setores da mesma antena. Sem essa coluna, a tabela sugere três lugares onde há um só.
+
+### Comparar dois números
+
+Em `Comparar dois números`, o sistema cruza dois alvos e mostra:
+
+- **contatos em comum**, com quantas chamadas cada lado fez para cada um;
+- **lugares em comum**, pelas estações físicas que os dois usaram;
+- **no mesmo lugar ao mesmo tempo** — lugar em comum é indício fraco; lugar em comum dentro de uma janela curta é o achado;
+- **contato direto** entre eles, com volume, duração e direção;
+- **rotina parecida**, em porcentagem. Compara o formato do horário, não o volume: dois números com a mesma rotina e volumes muito diferentes saem parecidos.
 
 ## 6.13. Grafo
 
@@ -539,7 +567,7 @@ O `ERBs Analyzer` foi desenhado para que o usuário do executável consiga:
 - comparar extratos no split-view;
 - ler a linha do tempo no Gantt;
 - investigar qualidade de números em `Telefones`;
-- aprofundar em `Voz`, `Conexão` e `Avançado`;
+- aprofundar em `Voz`, `Conexão` e no dossiê do número;
 - mapear relacionamentos no `Grafo`;
 - cruzar fontes em `Correlação`;
 - gerar evidências em `Exportações`;
@@ -550,6 +578,6 @@ Se estiver em dúvida, siga esta sequência curta:
 1. abrir ou criar um caso;
 2. importar um extrato `.xlsx`;
 3. validar o caso no mapa;
-4. aprofundar em `Telefones`, `Gantt`, `Voz` e `Avançado`;
+4. aprofundar em `Telefones`, no dossiê do número, `Gantt` e `Voz`;
 5. cruzar em `Grafo` e `Correlação`;
 6. exportar quando os filtros e o alvo estiverem estáveis.
