@@ -207,7 +207,7 @@ O `Mapa ERBs` é a principal tela de leitura espacial e temporal. Ele permite:
 - ajustar o setor: a abertura vem estimada por estação e o controle de raio é um multiplicador (x0.5 a x2) sobre o alcance que o sistema calcula para cada antena;
 - desenhar geofence e corredor;
 - consultar permanência por raio e duração;
-- destacar POIs e focar no contexto de um marcador analítico.
+- destacar POIs, identificados no mapa por um farol hexagonal com ícone do tipo e etiqueta com o nome, e focar no contexto de um marcador analítico.
 
 ### Recursos táticos principais
 
@@ -242,7 +242,11 @@ Compara as estações dominantes antes e depois de uma data, separando em **surg
 
 ## 6.6. POIs
 
-Os POIs podem ser criados no caso e usados no mapa para leitura contextual. O sistema permite:
+Os POIs podem ser criados no caso e usados no mapa para leitura contextual.
+
+No mapa, cada POI é desenhado como um **farol tático**: um distintivo hexagonal com o ícone do tipo escolhido (casa para residência, maleta para trabalho, triângulo de alerta para local do crime, escudo para base operacional, cadeado para presídio, pessoas para encontro), preso por uma haste sobre a coordenada exata, com um halo que pulsa e uma etiqueta com o nome do ponto sempre visível. O POI selecionado ganha anel âmbar e pulso mais rápido. O desenho é o mesmo no Leaflet e no Google Maps, e também no `map.html` exportado.
+
+O sistema permite:
 
 - cadastrar POIs por coordenada manual;
 - cadastrar POIs por endereço manual;
