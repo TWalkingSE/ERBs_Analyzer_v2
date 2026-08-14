@@ -12,7 +12,6 @@ O `ERBs Analyzer` é uma aplicação local para análise técnico-investigativa 
 
 <img width="1903" height="950" alt="image" src="https://github.com/user-attachments/assets/de33a525-08e9-4122-b0e4-edf5b7497dd4" />
 
-
 O processamento principal é local: casos, extratos importados, análises, correlações, grafos, exportações e configurações ficam na própria estação de trabalho.
 
 O pacote distribuído normalmente contém:
@@ -107,9 +106,19 @@ A chave existe para evitar que qualquer pessoa com acesso ao navegador realize a
 
 #### É preciso colocar toda vez que abre o aplicativo?
 
-Não. A interface pede a chave apenas quando você tenta acessar uma área protegida. O navegador pode lembrar o valor durante a sessão, mas, por segurança, ele não fica salvo permanentemente no navegador. Se fechar o navegador ou limpar os dados, será necessário digitá-la novamente ao tentar uma ação protegida.
+**Não.** A chave é instalada uma única vez, naquele navegador, e continua valendo depois disso: você pode fechar a aba, fechar o navegador, desligar o computador e reabrir o aplicativo no dia seguinte que ela ainda estará ativa. Não há mais pedido de chave a cada sessão.
 
-A chave em si é salva no arquivo `data\config\admin_key` e permanece a mesma enquanto você preservar a pasta `data` da instalação.
+Ela só para de valer nestas situações:
+
+1. você mesmo remover a chave, no painel `Acesso admin` > `Remover chave`;
+2. você limpar os dados de navegação do site (ou usar outro navegador, outro perfil, ou uma janela anônima);
+3. o aplicativo abrir em um endereço diferente do habitual — veja abaixo.
+
+Nesses casos, basta instalar a chave de novo pelo mesmo painel.
+
+**Sobre o endereço:** o aplicativo normalmente abre em `http://127.0.0.1:8765`. Se essa porta estiver ocupada (por exemplo, se outra cópia do programa já estiver rodando), ele sobe na porta seguinte, `8766`, e o navegador trata esse endereço como um site diferente — a chave instalada em `8765` não aparece ali. Se o botão voltar a mostrar `Acesso admin` em vez de `Admin ativo`, confira o endereço na barra do navegador: fechar a instância extra e reabrir o programa costuma devolver a porta padrão.
+
+A chave em si é salva no arquivo `data\config\admin_key` e permanece a mesma enquanto você preservar a pasta `data` da instalação. Ou seja: o valor a colar é sempre o mesmo, mesmo que você precise instalá-lo novamente.
 
 #### Onde conseguir a chave
 
@@ -117,9 +126,11 @@ A chave em si é salva no arquivo `data\config\admin_key` e permanece a mesma en
 2. Entre em `data\config`.
 3. Abra o arquivo `admin_key` com um editor de texto simples (Bloco de Notas, por exemplo).
 4. Copie o conteúdo do arquivo (é uma string longa de letras e números).
-5. Na interface do ERBs Analyzer, quando aparecer o campo de "Chave admin", cole esse valor.
+5. Na interface do ERBs Analyzer, clique no botão `Acesso admin` (canto inferior direito), cole o valor no campo "Chave administrativa" e clique em `Instalar chave`.
 
-**Importante:** não compartilhe a pasta `data` nem o arquivo `admin_key` com terceiros, pois quem tiver acesso a esse arquivo poderá realizar alterações administrativas na instalação.
+Quando a chave está instalada, o botão muda para `Admin ativo` em verde. Esse é o indicador de que você não precisa fazer mais nada — inclusive nas próximas vezes em que abrir o aplicativo.
+
+**Importante:** não compartilhe a pasta `data` nem o arquivo `admin_key` com terceiros, pois quem tiver acesso a esse arquivo poderá realizar alterações administrativas na instalação. Como a chave agora fica instalada no navegador, em computador compartilhado remova-a em `Acesso admin` > `Remover chave` ao terminar de usar.
 
 ### 5.3. Fluxo operacional recomendado
 
@@ -487,7 +498,7 @@ Proteja especialmente:
 
 ### 8.3. Modo protegido
 
-No primeiro uso, a instalação cria `data\config\admin_key`. Operações sensíveis exigem essa credencial. O painel `Acesso admin` a guarda apenas na sessão atual do navegador. A chave Google salva no aplicativo fica cifrada no JSON de configuração.
+No primeiro uso, a instalação cria `data\config\admin_key`. Operações sensíveis exigem essa credencial. O painel `Acesso admin` instala a chave uma única vez no navegador e a mantém válida nas sessões seguintes, até você removê-la em `Remover chave`. A chave Google salva no aplicativo fica cifrada no JSON de configuração.
 
 ### 8.4. Boas práticas de uso
 
