@@ -98,11 +98,32 @@ Na primeira execução, o sistema cria automaticamente um arquivo com a chave de
 
 #### O que é essa chave
 
-É um segredo local que protege funções administrativas e sensíveis do sistema, como alterar a base mestre de ERBs, acessar configurações de APIs pagas (ex: Google Maps) e executar operações que podem afetar todos os casos da instalação.
+É um segredo local que autoriza **toda operação de escrita** do sistema. Enquanto a chave não estiver instalada no navegador, o aplicativo funciona em modo somente leitura.
+
+Dependem da chave:
+
+- criar e excluir casos, e remover extratos de um caso;
+- importar extratos `.xlsx`;
+- criar, editar e excluir POIs;
+- definir e remover apelidos de números;
+- criar e excluir casos GPS, e importar ou remover trilhas;
+- importar, corrigir, commitar e reverter a base mestre de ERBs, inclusive o registro de CGIs;
+- salvar, desbloquear e remover a configuração do Google Maps;
+- alterar os limites operacionais da instalação.
+
+Continuam disponíveis sem a chave: abrir casos já existentes, navegar por todos os módulos analíticos (`Mapa ERBs`, `Telefones`, dossiê do número, `Voz`, `Conexão`, `Gantt`, `Grafo`, `Correlação`), consultar a base de ERBs e gerar exportações.
 
 #### Por que ela é necessária
 
-A chave existe para evitar que qualquer pessoa com acesso ao navegador realize alterações destrutivas ou custosas. Como o executável sobe um servidor local na sua máquina, sem a chave de admin o acesso a funções protegidas fica bloqueado.
+A chave existe para evitar que qualquer pessoa com acesso ao navegador realize alterações destrutivas ou custosas. Como o executável sobe um servidor local na sua máquina, sem a chave de admin toda operação que grava dados fica bloqueada.
+
+Na prática, isso faz da instalação da chave o **primeiro passo do primeiro uso**: sem ela você não consegue nem criar o caso inicial nem importar o primeiro extrato. Quando a chave falta, a interface responde com a mensagem:
+
+```text
+401 Unauthorized: acesso administrativo necessário. Abra "Acesso admin" e instale uma chave válida neste navegador.
+```
+
+Se essa mensagem aparecer no meio do trabalho, não é erro de importação nem de arquivo: é a chave que saiu do navegador. Reinstale-a pelo painel `Acesso admin` e repita a operação.
 
 #### É preciso colocar toda vez que abre o aplicativo?
 
@@ -136,11 +157,12 @@ Quando a chave está instalada, o botão muda para `Admin ativo` em verde. Esse 
 
 O uso padrão da ferramenta normalmente segue esta ordem:
 
-1. criar ou abrir um caso;
-2. importar um ou mais extratos;
-3. validar o caso no `Mapa ERBs`;
-4. aprofundar em `Telefones` e no dossiê de cada número, `Voz`, `Conexão`, `Gantt`, `Grafo` e `Correlação`;
-5. gerar exportações quando a análise estiver madura.
+1. instalar a chave de administrador, uma única vez por navegador, conforme a seção 5.2 — sem ela o passo seguinte já falha;
+2. criar ou abrir um caso;
+3. importar um ou mais extratos;
+4. validar o caso no `Mapa ERBs`;
+5. aprofundar em `Telefones` e no dossiê de cada número, `Voz`, `Conexão`, `Gantt`, `Grafo` e `Correlação`;
+6. gerar exportações quando a análise estiver madura.
 
 ## 6. Módulos e funções do sistema
 
@@ -650,9 +672,10 @@ O `ERBs Analyzer` foi desenhado para que o usuário do executável consiga:
 
 Se estiver em dúvida, siga esta sequência curta:
 
-1. abrir ou criar um caso;
-2. importar um extrato `.xlsx`;
-3. validar o caso no mapa;
-4. aprofundar em `Telefones`, no dossiê do número, `Gantt` e `Voz`;
-5. cruzar em `Grafo` e `Correlação`;
-6. exportar quando os filtros e o alvo estiverem estáveis.
+1. instalar a chave de administrador (seção 5.2), se ainda não estiver com `Admin ativo`;
+2. abrir ou criar um caso;
+3. importar um extrato `.xlsx`;
+4. validar o caso no mapa;
+5. aprofundar em `Telefones`, no dossiê do número, `Gantt` e `Voz`;
+6. cruzar em `Grafo` e `Correlação`;
+7. exportar quando os filtros e o alvo estiverem estáveis.
