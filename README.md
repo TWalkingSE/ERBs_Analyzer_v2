@@ -381,17 +381,71 @@ O `map.html` gera um mapa standalone interativo com Leaflet embutido, marcadores
 
 ## 6.16. Base ERBs
 
-O módulo `Base ERBs` é usado para administrar a base mestre de estações. Ele permite:
+### O que a tela faz
+
+O módulo `Base ERBs` administra a base mestre de estações: o cadastro de antenas de TIM, VIVO e CLARO que a instalação usa como referência cartográfica. Ele permite:
 
 - buscar por operadora, UF, cidade, bairro e estação;
 - editar registros;
 - criar registros manuais;
 - importar atualização por planilha `.xlsx` ou arquivo `.csv`;
-- revisar staging e diff;
+- revisar staging e diff antes de aplicar;
 - executar commit e rollback de versões;
 - consultar histórico da base.
 
 É uma área sensível. Só altere essa base com critério documental.
+
+### Como atualizar a base de ERBs
+
+A base é atualizada pela própria interface do aplicativo. Não é necessário receber um executável novo nem reinstalar nada. O procedimento exige a chave de administrador descrita na seção 5.2.
+
+1. Abra o `erbs_analyzer_server.exe` e aguarde a interface no navegador.
+2. Clique em `Acesso admin` e instale a chave, caso ainda não tenha feito isso neste navegador.
+3. Entre no módulo `Base ERBs`.
+4. Envie a planilha da base nova no campo de importação.
+5. Aguarde a conversão. Uma planilha de cerca de 108 mil estações leva por volta de 20 segundos.
+6. Revise o diff apresentado: quantas estações entraram, quantas saíram e quantas mudaram.
+7. Preencha uma `tag` que identifique a versão, por exemplo `julho2026`.
+8. Confirme o commit.
+
+### Formato aceito
+
+Planilha `.xlsx` com os dados na primeira aba e uma linha de cabeçalho contendo estas doze colunas, exatamente com estes nomes:
+
+`Número Estação`, `Operadora`, `SiglaUf`, `MUN`, `Bairro`, `Logradouro`, `Latitude`, `Longitude`, `IBGE`, `ClassInfraFisica`, `Tecs`, `Faixa`.
+
+Também é aceito arquivo `.csv` com separador `;`, sem linha de cabeçalho, com as colunas na mesma ordem acima.
+
+Se faltar qualquer uma das colunas, a importação é recusada e a base atual permanece intacta. São carregadas apenas as estações de TIM, VIVO e CLARO; linhas de outras operadoras são ignoradas.
+
+### Resultado esperado
+
+- a base ativa passa a ser a versão nova, identificada pela `tag` informada;
+- a versão anterior é arquivada automaticamente, permitindo rollback;
+- a mudança vale imediatamente, sem reiniciar o executável;
+- o total de estações e a versão vigente aparecem no topo da tela.
+
+### O que a atualização muda, e o que não muda
+
+Muda:
+
+- a busca e o cadastro de estações dentro do próprio módulo `Base ERBs`;
+- o raio dos círculos de cobertura estimada, que deriva da faixa licenciada da estação;
+- o cadastro herdado pelos CGIs que ainda não tinham estação associada.
+
+Não muda:
+
+- a posição dos pontos que já aparecem no mapa dos casos importados. Essas coordenadas vêm do extrato entregue pela operadora, não da base mestre, e permanecem como estão. Atualizar a base mestre não desloca nem corrige marcador de caso já importado.
+
+### Como voltar para a versão anterior
+
+Na mesma tela, no histórico de versões, escolha a versão desejada e execute o rollback. O estado atual também é arquivado antes da restauração, então é possível ir e voltar entre versões.
+
+### Cuidados
+
+- a pasta da instalação precisa ter permissão de escrita, porque a importação grava arquivos temporários em `data\erb_db`. Evite instalar o pacote em `C:\Program Files`;
+- guarde a planilha de origem junto da documentação do trabalho, para rastreabilidade;
+- ao substituir o executável por uma versão nova, preserve a pasta `data` para não perder a base já carregada.
 
 ## 7. Como habilitar o Google Maps na instalação
 
@@ -558,6 +612,12 @@ Na maior parte dos casos, o problema é um destes:
 - erro de quota, billing ou restrição da chave.
 
 Se necessário, use coordenadas manuais para não interromper o fluxo investigativo.
+
+### 9.6. Atualizei a base de ERBs e o mapa do caso não mudou
+
+Esse é o comportamento esperado. A posição dos eventos de um caso vem do extrato entregue pela operadora, não da base mestre. A base mestre alimenta a busca de estações, o cadastro herdado por CGI e o raio de cobertura estimada, e não a posição dos eventos já importados.
+
+Se a expectativa era ver as estações novas, confira no topo da tela `Base ERBs` se a versão vigente é a que você acabou de commitar.
 
 ## 10. O que informar ao suporte ou ao time de testes
 
