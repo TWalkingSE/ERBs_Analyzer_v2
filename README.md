@@ -1,8 +1,8 @@
-# Guia do Usuário do Executável
+# Guia de Funcionalidades do ERBs Analyzer v2
 
 ## 1. O que é este pacote
 
-O `ERBs Analyzer` é uma aplicação local para análise técnico-investigativa de extratos telefônicos de telefonia móvel. O executável abre um servidor local na própria máquina e entrega a interface no navegador padrão.
+O **ERBs Analyzer v2** é uma aplicação de análise técnico-investigativa de extratos telefônicos de telefonia móvel. Ele recebe planilhas de operadoras, normaliza os eventos de voz e conexão, enriquece os dados com a localização de torres (ERBs) e entrega visualizações interativas, análises comportamentais, alertas e relatórios exportáveis.
 
 <img width="886" height="563" alt="image" src="https://github.com/user-attachments/assets/2475f104-45df-4cb6-9541-8c38f6e2e0a0" />
 
@@ -12,670 +12,488 @@ O `ERBs Analyzer` é uma aplicação local para análise técnico-investigativa 
 
 <img width="1903" height="950" alt="image" src="https://github.com/user-attachments/assets/de33a525-08e9-4122-b0e4-edf5b7497dd4" />
 
-O processamento principal é local: casos, extratos importados, análises, correlações, grafos, exportações e configurações ficam na própria estação de trabalho.
 
-O pacote distribuído normalmente contém:
+Este documento explica de forma detalhada o que cada funcionalidade faz, como é interpretada e como o usuário pode aproveitá-la na rotina investigativa.
 
-- `erbs_analyzer_server.exe`: executável principal.
-- `_internal`: bibliotecas e arquivos internos do aplicativo.
-- `data`: pasta de dados locais da instalação.
-- `erbs_analyzer.ico`: ícone distribuído com o pacote.
-- `GUIA_USUARIO_EXECUTAVEL.md`: este guia completo.
-- `LEIA-ME_TESTADORES.txt`: instruções rápidas para validação e suporte.
+---
 
-Não mova o `.exe` para fora da pasta do pacote e não execute o aplicativo de dentro de um `.zip`.
+## 1. Conceitos fundamentais
 
-## 2. Como o executável funciona
+### 1.1 ERB — Estação Rádio Base
 
-Ao abrir `erbs_analyzer_server.exe`, o sistema:
+ERB é a torre de celular usada para conectar o aparelho à rede móvel. Cada ERB possui um identificador único chamado **CGI** (Cell Global Identity) e, quando disponível, coordenadas geográficas (`latitude` e `longitude`) e o **azimute** — a direção do setor da antena (de 0° a 360°).
 
-- sobe um servidor local em `127.0.0.1`;
-- carrega os dados da pasta `data`;
-- serve a interface web já embutida no pacote;
-- abre o navegador automaticamente quando a aplicação estiver pronta.
+No ERBs Analyzer, a ERB é usada para:
+- posicionar eventos no mapa;
+- estimar área de cobertura por CGI;
+- identificar padrões de permanência e deslocamento;
+- cruzar eventos com pontos de interesse (POIs).
 
-Se o navegador não abrir sozinho, use manualmente a URL exibida na janela do executável, normalmente `http://127.0.0.1:8765`.
+### 1.2 CGI — Cell Global Identity
 
-## 3. Onde os dados ficam
+O CGI é uma chave composta que identifica uma célula de rede:
 
-Por padrão, a instalação usa a pasta `data` do próprio pacote.
+`MCC-MNC-LAC-CI`
 
-Locais mais importantes:
+- **MCC**: Mobile Country Code (país). No Brasil, geralmente `724`.
+- **MNC**: Mobile Network Code (operadora). Exemplos: `02`/`04` (TIM), `05`/`12` (Claro), `06`/`10`/`11` (Vivo).
+- **LAC**: Location Area Code (área de localização).
+- **CI**: Cell Identity (célula específica).
 
-- `data\cases`: casos, extratos importados, auditoria do caso e exportações.
-- `data\erb_db`: base mestre de ERBs usada pelos mapas e cruzamentos.
-- `data\config\app_settings.json`: configurações locais da instalação, inclusive Google Maps em runtime.
-- `data\config\admin_key`: credencial administrativa criada automaticamente no primeiro uso; não compartilhe este arquivo.
-- `data\audit\system.jsonl`: trilha de auditoria sistêmica de eventos administrativos e operacionais.
+O parser extrai o CGI do extrato e o utiliza para localizar a ERB na base mestre ou na base de CGIs dos próprios extratos.
 
-Se você receber uma nova versão do executável, preserve a pasta `data` caso queira manter casos, base ERB e configurações já existentes.
+Nem toda operadora entrega um CGI completo. Quando o extrato traz apenas coordenada ou identificação própria de site, o parser gera uma **chave sintética** (`VIVO:noCGI:...`, `CLARO:{site}:{setor}`) que cumpre o mesmo papel de chave de célula. O filtro por CGI ([3.4.2](#342-filtros)) trabalha com as duas formas.
 
-## 4. O que funciona online e offline
+O CGI também é a unidade de recorte mais fina do mapa: ele identifica um **setor** específico, e não a estação inteira. Uma mesma torre com três setores aparece como três CGIs distintos.
 
-### 4.1. O que funciona localmente, mesmo sem internet
+### 1.3 MSISDN, IMEI e IMSI
 
-As operações abaixo continuam locais e independem de um servidor remoto da aplicação:
+- **MSISDN**: número do telefone do assinante, com DDD e `55` (ex: `5511912345678`).
+- **IMEI**: identificador do aparelho. Serve para saber se o mesmo celular foi usado por chips diferentes.
+- **IMSI**: identificador do chip/SIM. Ajuda a detectar troca de chips no mesmo aparelho.
 
-- criação e gestão de casos;
-- importação de extratos `.xlsx`;
-- normalização e persistência de dados canônicos;
-- navegação entre módulos analíticos;
-- análises de Telefones, dossiê do número, comparação entre números, Voz, Conexão, Grafo, Correlação e Gantt;
-- exportações CSV, XLSX, KML, PDF, HTML e mapa interativo HTML;
-- leitura de POIs cadastrados manualmente por coordenada.
+### 1.4 Target / alvo
 
-### 4.2. O que depende de internet
+O alvo é o MSISDN principal da investigação. O sistema tenta detectá-lo automaticamente a partir do nome do arquivo, cabeçalho da planilha, abas, e da frequência do número nos eventos. Quando o dado não permite inferência, o usuário pode selecionar manualmente.
 
-Alguns recursos cartográficos e de geocodificação usam serviços externos:
+### 1.5 POI — Point of Interest
 
-- `Leaflet` usa basemaps online, como OpenStreetMap, Esri e CARTO.
-- `Google Maps` carrega a SDK e o mapa-base do Google.
-- geocodificação por endereço usa a API Google quando a chave está configurada.
+POI é um ponto de interesse cadastrado manualmente pelo usuário: endereço de residência, trabalho, local de encontro, endereço de testemunha etc. Cada POI tem coordenadas e um raio configurável. O sistema cruza eventos no raio e gera resumos analíticos.
 
-Sem internet, o sistema pode continuar abrindo e processando os dados locais, mas o mapa-base pode ficar incompleto ou em branco e a geocodificação por endereço pode falhar.
+Cada POI recebe um **tipo**, e o tipo define o símbolo e a cor com que ele aparece no mapa (ver [3.5](#35-marcadores-analíticos-pois)). São 13 tipos, agrupados por natureza:
 
-### 4.3. Leitura prática do modo offline
+| Grupo | Tipos |
+|---|---|
+| Locais do fato | Local do crime · Ponto de tráfico · Encontro |
+| Moradia | Casa/Residência · Apartamento/Condomínio · Hotel/Motel |
+| Atividade | Empresa/Trabalho · Loja/Comércio · Escola/Faculdade · Hospital/Saúde |
+| Operacional | Base operacional · Presídio |
+| — | Outros |
 
-- o caso, os extratos e os painéis analíticos continuam locais;
-- o mapa pode continuar útil para overlays, filtros e contexto interno, mas pode perder o pano de fundo cartográfico se os tiles não carregarem;
-- o Google Maps exige internet, billing e chave válida;
-- POIs por coordenada manual continuam sendo uma alternativa segura quando a geocodificação não estiver disponível.
+O tipo é editável a qualquer momento e não altera os dados do POI, apenas como ele é lido no mapa.
 
-## 5. Primeiro uso
+### 1.6 Geofence e Corredor
 
-### 5.1. Como abrir
+- **Geofence**: área poligonal desenhada no mapa. O sistema responde quais eventos ocorreram dentro da área, em quais dias, por quanto tempo e quais ERBs/CGIs foram dominantes.
+- **Corredor**: faixa desenhada ao longo de uma rota (como uma via). Serve para verificar se o alvo passou por determinado caminho.
 
-1. Extraia o pacote inteiro para uma pasta local do Windows.
-2. Mantenha juntos: `erbs_analyzer_server.exe`, `_internal`, `data`, `GUIA_USUARIO_EXECUTAVEL.md` e `LEIA-ME_TESTADORES.txt`.
-3. Execute `erbs_analyzer_server.exe`.
-4. Aguarde a interface abrir no navegador.
+### 1.7 Stay points (pontos de permanência)
 
-### 5.2. Chave de administrador (admin key)
+São agrupamentos de eventos em que o aparelho permanece em uma mesma região por um tempo mínimo e dentro de um raio mínimo. Servem para identificar locais de moradia, trabalho, pontos de encontro e padrões de repouso.
 
-Na primeira execução, o sistema cria automaticamente um arquivo com a chave de administrador em:
+### 1.8 Colocalização
 
-`data\config\admin_key`
+**Colocalização** identifica outros MSISDNs que apareceram na mesma célula (CGI) — ou próximos — no mesmo intervalo de tempo do alvo. A ideia é encontrar possíveis companheiros de deslocamento, encontros ou pessoas que estavam no mesmo ambiente no mesmo momento.
 
-#### O que é essa chave
+O sistema permite configurar:
+- **minutos próximos**: margem de tempo para considerar que dois eventos são coincidentes;
+- **máximo de pares**: quantos resultados mostrar;
+- **limite de mínimos eventos**: quantas coincidências são necessárias para considerar uma colocação relevante.
 
-É um segredo local que autoriza **toda operação de escrita** do sistema. Enquanto a chave não estiver instalada no navegador, o aplicativo funciona em modo somente leitura.
+### 1.9 Velocidade implausível
 
-Dependem da chave:
+A ferramenta detecta deslocamentos entre dois eventos consecutivos que exigiriam velocidade superior ao limite configurado (padrão `200 km/h`). Isso pode indicar:
+- erro nos dados ou CGIs distantes em curto tempo;
+- deslocamento real por meio de transporte muito rápido (avião, etc.);
+- necessidade de verificação com rotas reais (via Google Distance Matrix, quando configurado).
 
-- criar e excluir casos, e remover extratos de um caso;
-- importar extratos `.xlsx`;
-- criar, editar e excluir POIs;
-- definir e remover apelidos de números;
-- criar e excluir casos GPS, e importar ou remover trilhas;
-- importar, corrigir, commitar e reverter a base mestre de ERBs, inclusive o registro de CGIs;
-- salvar, desbloquear e remover a configuração do Google Maps;
-- alterar os limites operacionais da instalação.
+### 1.10 Burner phone
 
-Continuam disponíveis sem a chave: abrir casos já existentes, navegar por todos os módulos analíticos (`Mapa ERBs`, `Telefones`, dossiê do número, `Voz`, `Conexão`, `Gantt`, `Grafo`, `Correlação`), consultar a base de ERBs e gerar exportações.
+**Burner phone** é um telefone descartável, normalmente identificado por uso intenso em pouco tempo e poucos contatos. A ferramenta aplica regras configuráveis para sinalizar aparelhos com:
+- vida útil curta (poucos dias);
+- baixo número de contatos únicos;
+- alta concentração de eventos em janela curta.
 
-#### Por que ela é necessária
+### 1.11 Bursts
 
-A chave existe para evitar que qualquer pessoa com acesso ao navegador realize alterações destrutivas ou custosas. Como o executável sobe um servidor local na sua máquina, sem a chave de admin toda operação que grava dados fica bloqueada.
+**Burst** é um pico repentino de atividade (chamadas, conexões ou ambos) em janela curta. Serve para detectar momentos de tensão, preparação de ação, comunicação coordenada ou comportamento atípico.
 
-Na prática, isso faz da instalação da chave o **primeiro passo do primeiro uso**: sem ela você não consegue nem criar o caso inicial nem importar o primeiro extrato. Quando a chave falta, a interface responde com a mensagem:
+### 1.12 Período de silêncio
 
-```text
-401 Unauthorized: acesso administrativo necessário. Abra "Acesso admin" e instale uma chave válida neste navegador.
-```
+Identifica intervalos longos sem eventos em um aparelho ativo. Pode indicar desligamento, abandono do chip, mudança de aparelho ou viagem.
 
-Se essa mensagem aparecer no meio do trabalho, não é erro de importação nem de arquivo: é a chave que saiu do navegador. Reinstale-a pelo painel `Acesso admin` e repita a operação.
+### 1.13 Troca de IMEI e troca de chip
 
-#### É preciso colocar toda vez que abre o aplicativo?
+- **IMEI swap**: o mesmo MSISDN aparece com IMEIs diferentes em curto espaço de tempo.
+- **Chip swap**: o mesmo IMEI é usado por IMSIs diferentes, indicando troca de chip no mesmo aparelho.
 
-**Não.** A chave é instalada uma única vez, naquele navegador, e continua valendo depois disso: você pode fechar a aba, fechar o navegador, desligar o computador e reabrir o aplicativo no dia seguinte que ela ainda estará ativa. Não há mais pedido de chave a cada sessão.
+### 1.14 Chamadas redirecionadas
 
-Ela só para de valer nestas situações:
+A função detecta cadeias de redirecionamento de chamadas (`A -> B -> C`). Ajuda a entender encaminhamentos, secretárias eletrônicas e possíveis ocultações de destino final.
 
-1. você mesmo remover a chave, no painel `Acesso admin` > `Remover chave`;
-2. você limpar os dados de navegação do site (ou usar outro navegador, outro perfil, ou uma janela anônima);
-3. o aplicativo abrir em um endereço diferente do habitual — veja abaixo.
+### 1.15 Correlacionamento
 
-Nesses casos, basta instalar a chave de novo pelo mesmo painel.
+Permite cruzar dois ou mais extratos para encontrar:
+- MSISDNs comuns;
+- IMEIs compartilhados;
+- CGIs comuns;
+- sobreposição temporal de eventos.
 
-**Sobre o endereço:** o aplicativo normalmente abre em `http://127.0.0.1:8765`. Se essa porta estiver ocupada (por exemplo, se outra cópia do programa já estiver rodando), ele sobe na porta seguinte, `8766`, e o navegador trata esse endereço como um site diferente — a chave instalada em `8765` não aparece ali. Se o botão voltar a mostrar `Acesso admin` em vez de `Admin ativo`, confira o endereço na barra do navegador: fechar a instância extra e reabrir o programa costuma devolver a porta padrão.
+---
 
-A chave em si é salva no arquivo `data\config\admin_key` e permanece a mesma enquanto você preservar a pasta `data` da instalação. Ou seja: o valor a colar é sempre o mesmo, mesmo que você precise instalá-lo novamente.
+## 2. Fluxo de trabalho típico
 
-#### Onde conseguir a chave
+1. **Criar um caso** — organiza os extratos e configurações.
+2. **Importar extratos** — upload de planilhas `.xlsx` de operadoras.
+3. **Revisar o alvo detectado** — confirmar ou corrigir o MSISDN principal.
+4. **Cadastrar POIs** — endereços de interesse com coordenadas e raios.
+5. **Explorar o mapa tático** — visualizar eventos, trajetos, heatmap e playback.
+6. **Aplicar análises** — Telefones e o dossiê do número, Voz, Conexão, Grafo, Correlação.
+7. **Exportar evidências** — CSV, XLSX, KML, PDF, HTML, mapa interativo.
 
-1. Abra a pasta do executável.
-2. Entre em `data\config`.
-3. Abra o arquivo `admin_key` com um editor de texto simples (Bloco de Notas, por exemplo).
-4. Copie o conteúdo do arquivo (é uma string longa de letras e números).
-5. Na interface do ERBs Analyzer, clique no botão `Acesso admin` (canto inferior direito), cole o valor no campo "Chave administrativa" e clique em `Instalar chave`.
+---
 
-Quando a chave está instalada, o botão muda para `Admin ativo` em verde. Esse é o indicador de que você não precisa fazer mais nada — inclusive nas próximas vezes em que abrir o aplicativo.
+## 3. Módulos e funcionalidades
 
-**Importante:** não compartilhe a pasta `data` nem o arquivo `admin_key` com terceiros, pois quem tiver acesso a esse arquivo poderá realizar alterações administrativas na instalação. Como a chave agora fica instalada no navegador, em computador compartilhado remova-a em `Acesso admin` > `Remover chave` ao terminar de usar.
+### 3.1 Gestão de casos
 
-### 5.3. Fluxo operacional recomendado
+Cada investigação é um **caso**. O caso agrupa extratos, POIs, configurações e resultados. É possível:
+- criar casos e editar nome e descrição (o identificador do caso não muda);
+- abrir o painel do caso com resumo e atalhos;
+- ver o histórico de extratos importados;
+- acompanhar a auditoria de eventos administrativos.
 
-O uso padrão da ferramenta normalmente segue esta ordem:
+**Lixeira.** Excluir um caso não apaga nada: a pasta inteira (extratos, POIs, apelidos e a trilha de auditoria do caso) vai para a lixeira, no painel de casos. De lá o caso volta igual com *Restaurar*, ou sai do disco com *Apagar de vez*, que pede confirmação. Não há limpeza automática. Se já existir um caso ativo com o mesmo identificador, a restauração é recusada para não sobrescrever nada. Os casos GPS têm a sua própria lixeira, no painel GPS.
 
-1. instalar a chave de administrador, uma única vez por navegador, conforme a seção 5.2 — sem ela o passo seguinte já falha;
-2. criar ou abrir um caso;
-3. importar um ou mais extratos;
-4. validar o caso no `Mapa ERBs`;
-5. aprofundar em `Telefones` e no dossiê de cada número, `Voz`, `Conexão`, `Gantt`, `Grafo` e `Correlação`;
-6. gerar exportações quando a análise estiver madura.
+**Levar um caso para outra máquina.** O `case.zip` da tela de exportações leva o caso inteiro com um `SHA256SUMS.txt`. Em *Importar caso (.zip)*, no painel de casos, ele é instalado de volta. Cada arquivo é conferido contra o `SHA256SUMS.txt` antes de qualquer coisa entrar na lista de casos. Um arquivo a mais, a menos, com hash diferente ou com caminho suspeito (`..`, caminho absoluto, link) recusa o pacote inteiro, e a mensagem diz qual arquivo falhou. Se o identificador já existir, o caso entra como `<id>-importado`. A trilha registra o SHA-256 do pacote recebido.
 
-## 6. Módulos e funções do sistema
+### 3.2 Importação de extratos
 
-## 6.1. Visão geral dos módulos
+A importação recebe arquivos `.xlsx` das operadoras TIM, VIVO e Claro. O sistema:
+- detecta automaticamente o parser correto;
+- identifica a operadora e o tipo (voz ou conexão);
+- preserva o nome original, hash e metadados do arquivo;
+- normaliza MSISDNs, IMEIs, IMSIs, CGIs, datas e coordenadas;
+- detecta e propaga o MSISDN alvo quando possível;
+- grava parquets canônicos (`canonical_calls.parquet`, `canonical_conns.parquet`, `canonical_erbs.parquet`);
+- gera warnings de qualidade (números parciais, alvos ambíguos, CGIs inválidos, etc.).
 
-| Módulo | O que entrega | Quando usar |
-| --- | --- | --- |
-| Dashboard de casos | Lista, cria e organiza investigações locais. | Sempre que iniciar ou retomar um caso. |
-| Painel do caso | Resume o caso, os extratos importados e os atalhos operacionais. | Como centro de navegação da investigação. |
-| Importação | Recebe extratos `.xlsx`, detecta parser, operadora e tipo do registro. | Para ingestão de novos arquivos. |
-| Mapa ERBs | Exibe eventos, heatmap, setores, cobertura, playback, breadcrumb, trajeto, geofence, corredor, permanência e POIs. | Leitura espacial principal do caso. |
-| Split-view | Compara dois extratos com enquadramento sincronizado. | Para confrontar fontes, períodos ou operadoras. |
-| Gantt | Organiza a linha do tempo por dia e horário. | Para leitura cronológica precisa. |
-| Telefones | Inventário pesquisável de todos os números do caso, com apelidos, qualidade dos dados e sinais do caso inteiro. | Ponto de entrada para tudo que envolve números. |
-| Dossiê do número | Reúne, num recorte só, tudo o que o caso registra sobre um número. | Quando o foco é um número específico e o resultado vai para um relatório. |
-| Comparar números | Cruza dois números por contatos, lugares, rotina e contato direto. | Para testar se duas pessoas se conhecem, se encontram ou compartilham círculo. |
-| Voz | Analisa chamadas, contrapartes, ERBs, reciprocidade e sinais comportamentais. | Para relação social e dinâmica de chamadas. |
-| Conexão | Analisa sessões de dados, bytes, duração, IMEIs, IPs, CGIs e ERBs. | Para rastro técnico do uso de dados. |
-| Grafo | Visualiza a rede de relacionamentos do caso. | Para cadeia de contato e clusters. |
-| Correlação | Cruza extratos por MSISDN, IMEI, CGI e overlap temporal. | Para confirmar convergência entre fontes. |
-| Exportações | Gera saídas CSV, XLSX, KML, PDF, HTML e mapa interativo HTML. | Para consolidação, auditoria e entrega. |
-| Base ERBs | Administra a base mestre de estações. | Para manutenção da infraestrutura cartográfica do sistema. |
+### 3.3 Base mestre de ERBs
 
-## 6.2. Dashboard de casos
+Módulo dedicado a manter a base de torres. Permite:
+- importar planilhas de ERBs em `.xlsx` ou `.csv`;
+- revisar o staging e comparar com a base atual (`diff`);
+- fazer `upsert`, `delete`, `commit` e `rollback`;
+- manter histórico versionado;
+- pesquisar CGIs e estender a base com coordenadas de outros extratos;
+- geolocalizar CGIs ausentes via Google Geolocation (quando configurado).
 
-No dashboard você consegue:
+**Registro CGI → sítio.** Além do master, o sistema mantém um registro de cada CGI já visto (`data/erb_db/cgi_registry.parquet`), compartilhado entre os casos: um CGI aprendido num caso passa a resolver nos outros.
+- **Precedência:** as origens seguem `manual > extract > geolocation > master_snap`. Uma origem de menor precedência não troca a coordenada, só preenche o que falta (estação, cidade, faixa).
+- **Casamento com o master:** cada CGI é ligado à estação do master mais próxima, até 150 m, que traz número da estação, endereço e as faixas usadas no raio de cobertura.
+- **Reaprender dos casos:** este botão relê os extratos de todos os casos. Use-o depois de atualizar o master; atualizar o master sozinho não reposiciona pontos no mapa.
+- **Cobertura da base:** o painel de cobertura de cada caso mostra quanta evidência ficou fora do mapa e quais células a levaram.
 
-- criar novos casos;
-- abrir casos existentes;
-- revisar rapidamente o inventário local de investigações.
+### 3.4 Mapa tático
 
-## 6.3. Painel do caso
+O mapa tático é o centro de visualização. Suporta dois motores de mapa: **Leaflet** (padrão, offline) e **Google Maps** (opcional, com API key).
 
-O painel do caso funciona como hub operacional. Ele mostra:
+#### 3.4.1 Camadas de visualização
 
-- nome e descrição do caso;
-- datas de criação e atualização;
-- lista de extratos já importados;
-- operadora, tipo do registro, quantidade de linhas e alvo inferido por extrato;
-- warnings de importação;
-- atalhos para todos os módulos do caso;
-- remoção de extratos quando necessário.
+- **Marcadores de eventos**: cada ponto representa uma chamada, conexão ou evento, com cor distinta para voz e conexão. No modo **agrupado** (padrão), um pin por ponto consolida os eventos e as ERBs dali; no modo **sem agregação**, cada evento é um marcador, até 18.000 na tela (o aviso diz quando o corte acontece; setores, calor e painéis seguem considerando todos).
+- **Heatmap**: aglomerado de densidade de eventos.
+- **Breadcrumb**: marcadores numerados do trajeto do alvo, em ordem cronológica.
+- **Trajetória**: linha que liga os eventos do alvo no tempo.
+- **Setores de azimute**: setor de abertura da antena. A abertura é estimada por estação (360° dividido pelo número de setores conhecidos, limitada a 30–120°) e vem do backend por CGI.
+- **Cobertura estimada**: raio contínuo derivado da densidade real de antenas vizinhas na base mestre e da faixa licenciada — 700 MHz alcança bem mais que 3,5 GHz a partir da mesma torre. O slider da tela é um **multiplicador** (×0.5 a ×2) sobre esse raio, não um valor absoluto.
+- **Melhor servidor (Voronoi)**: divide o mapa pela antena mais próxima de cada ponto. É a candidata mais plausível, não a cobertura medida — terreno, potência e azimute mandam mais. Disponível apenas no engine Leaflet.
+- **POIs**: farol tático sobre o local de interesse — distintivo hexagonal com ícone do tipo (casa, maleta, alerta, escudo, cadeado, pessoas, pin), haste apontando a coordenada exata, halo pulsante e etiqueta com o nome, mais o círculo do raio configurado. O POI selecionado ganha anel âmbar e pulso mais rápido. O desenho é idêntico no Leaflet e no Google Maps.
+- **Geofence / Corredor**: polígonos e rotas desenhadas manualmente.
 
-## 6.4. Importação de extratos
+#### 3.4.0 Painel de cobertura da base
 
-### O que a tela faz
+Diz quanta evidência do caso está **fora** do mapa e por quê: quantos CGIs resolvem para uma antena com coordenada, quantos eventos ficaram sem plotar, e quais células pesam mais nessa perda. É o que transforma "o mapa parece vazio" em uma lista de CGIs para resolver em `/erbs`.
 
-A tela `Importação` envia o arquivo ao backend e tenta identificar automaticamente:
-
-- a operadora;
-- o tipo do extrato, como `VOZ` ou `CONEXÃO`;
-- o parser mais adequado;
-- o MSISDN alvo, quando a estrutura permitir.
-
-### Formato aceito
-
-O fluxo principal da ferramenta usa arquivos `.xlsx`. Sempre prefira as planilhas originais exportadas pela fonte oficial.
-
-### Resultado esperado
-
-Ao concluir a importação, o sistema grava na pasta do caso:
-
-- o arquivo bruto `raw.xlsx`;
-- os parquet canônicos de chamadas, conexões e ERBs;
-- os metadados do extrato no manifesto do caso.
-
-## 6.5. Mapa ERBs
-
-O `Mapa ERBs` é a principal tela de leitura espacial e temporal. Ele permite:
-
-- alternar entre `Leaflet` e `Google Maps`;
-- alternar entre modo `Agrupado` e `Sem agregação`;
-- visualizar marcadores táticos, heatmap, setores de azimute, cobertura estimada, playback, breadcrumb e trajeto;
-- filtrar por extrato, MSISDN, operadora, cidade, período e janela temporal;
-- ajustar o setor: a abertura vem estimada por estação e o controle de raio é um multiplicador (x0.5 a x2) sobre o alcance que o sistema calcula para cada antena;
-- desenhar geofence e corredor;
-- consultar permanência por raio e duração;
-- destacar POIs, identificados no mapa por um farol hexagonal com ícone do tipo e etiqueta com o nome, e focar no contexto de um marcador analítico.
-
-### Recursos táticos principais
-
-- `Heatmap`: mostra concentração espacial.
-- `Breadcrumb`: mostra a sequência numerada do alvo.
-- `Trajeto`: liga os pontos e resume o deslocamento.
-- `Playback`: reproduz a dinâmica temporal do caso.
-- `Setores`: desenha o azimute estimado das ERBs.
-- `Cobertura`: mostra círculos de alcance estimado.
-- `Geofence e corredor`: delimitam área e eixo de passagem.
-- `Permanência`: resume pontos com maior tempo de retenção.
-- `Melhor servidor`: divide o mapa pela antena mais próxima de cada ponto. É a candidata mais plausível, não a cobertura medida. Só no Leaflet.
-- `Cobertura da base`: diz quanta evidência ficou **fora** do mapa e quais CGIs a engoliram.
-
-### Área provável de presença
+#### 3.4.5 Área provável de presença
 
 Um evento sozinho diz "em algum lugar deste setor". Três eventos consecutivos em setores diferentes dizem "na interseção", que costuma ser muito menor — a diferença entre apontar um bairro e apontar uma quadra.
 
-O sistema cruza as cunhas de setor de eventos próximos no tempo e lista as janelas da **área menor para a maior**. Área pequena significa posição mais certa.
+A ferramenta cruza as cunhas de setor de eventos próximos no tempo e devolve as janelas ordenadas da área menor para a maior. **Área pequena significa precisão alta.** Num caso real de referência, a janela mais precisa fechou em 0,036 km² — cerca de 3,6 hectares.
 
-Quando a interseção é mais fina do que a resolução do cálculo, a janela vem marcada como limitada pela resolução: a área mostrada é o **teto** que o método consegue afirmar, não uma medição.
+A interseção é calculada por amostragem numérica, não por geometria exata. Quando a faixa comum é mais fina do que a resolução da amostragem, a resposta marca `grid_limited` e a área devolvida é o **teto** que o método consegue afirmar, não uma medição.
 
-### Direção de deslocamento
+#### 3.4.6 Direção de deslocamento
 
-Rumo e velocidade entre estações consecutivas, com rosa dos ventos e direção dominante. O índice de consistência separa "foi de A para B" de "ficou indo e voltando".
+Rumo e velocidade entre estações consecutivas, com rosa dos ventos de 16 pontos e vetor dominante. O índice de consistência distingue "foi de A para B" de "ficou indo e voltando": perto de 1, os trechos apontam todos para o mesmo lado; perto de 0, se cancelam.
 
-Trocar de setor dentro da mesma torre não conta como deslocamento.
+Trocas de setor dentro da mesma torre não contam como deslocamento — sem esse filtro a rosa dos ventos vira ruído em torno de zero.
 
-### Mudança de base
+#### 3.4.7 Mudança de base
 
-Compara as estações dominantes antes e depois de uma data, separando em **surgidas**, **abandonadas** e **mantidas**. Responde se o alvo mudou de rotina, de endereço ou de cidade a partir daquele momento.
+Compara as estações dominantes antes e depois de um corte no tempo, separando em **surgidas**, **abandonadas** e **mantidas**. Serve para responder se o alvo mudou de rotina, de endereço ou de cidade a partir de uma data.
 
-## 6.6. POIs
+#### 3.4.2 Filtros
 
-Os POIs podem ser criados no caso e usados no mapa para leitura contextual.
+O painel tem duas camadas que **se somam**:
 
-No mapa, cada POI é desenhado como um **farol tático**: um distintivo hexagonal com o ícone do tipo escolhido (casa para residência, maleta para trabalho, triângulo de alerta para local do crime, escudo para base operacional, cadeado para presídio, pessoas para encontro), preso por uma haste sobre a coordenada exata, com um halo que pulsa e uma etiqueta com o nome do ponto sempre visível. O POI selecionado ganha anel âmbar e pulso mais rápido. O desenho é o mesmo no Leaflet e no Google Maps, e também no `map.html` exportado.
+**Filtro principal** — apenas um modo ativo por vez:
 
-O sistema permite:
+- cidade;
+- operadora;
+- período: janela temporal (`from`, `to`) e/ou faixa do dia (manhã, tarde, noite, madrugada).
 
-- cadastrar POIs por coordenada manual;
-- cadastrar POIs por endereço manual;
-- geocodificar endereço quando o Google estiver configurado;
-- definir raio, tipo e observações;
-- destacar hits de voz e conexão no raio do POI;
-- resumir ERBs dominantes, dias fortes e horários fortes;
-- persistir classificação e sugestão assistida de residência ou trabalho.
+**Filtros independentes** — combinam com o modo ativo e entre si:
 
-## 6.7. Split-view sincronizado
+- extrato;
+- alvo / MSISDN;
+- **célula (CGI)**.
 
-O `Split-view` coloca dois extratos lado a lado com pan e zoom sincronizados. Ele é útil para:
+##### Filtro por CGI
 
-- comparar duas operadoras;
-- comparar períodos diferentes;
-- validar convergência ou divergência espacial;
-- confrontar extratos mais limpos com extratos mais ruidosos.
+Isola os eventos de uma ou mais células específicas. Serve para responder perguntas que o filtro por cidade não alcança: *"o que aconteceu nesta antena, e só nela?"* — útil quando várias ERBs se sobrepõem na mesma região e a cidade inteira é ruído.
 
-## 6.8. Gantt
+Como funciona:
 
-O `Gantt do alvo` organiza os eventos em uma linha do tempo por dia e horário. Use quando precisar:
+- a lista de opções vem do próprio caso, com **contagem de eventos** e endereço de cada célula, ordenada da mais usada para a menos usada;
+- a busca aceita CGI, endereço ou cidade;
+- a seleção é múltipla: dois ou mais CGIs devolvem a **união** dos eventos;
+- células sem coordenada resolvida aparecem marcadas como tal — selecioná-las não plota nada, porque a base não sabe onde elas ficam;
+- o filtro vale para markers, heatmap, timeline, trajetória, breadcrumb, viagem impossível e para os painéis espaciais (permanência, resumo de POI), de modo que nenhum painel discorde do que está desenhado;
+- a lista de opções **não** encolhe conforme você seleciona — ela continua mostrando o caso inteiro, senão seria impossível ajustar a seleção.
 
-- localizar janelas de atividade intensa;
-- visualizar a ordem cronológica dos eventos;
-- comparar tempo e espaço em conjunto com o mapa;
-- voltar ao mapa mantendo o mesmo contexto temporal.
+A seleção fica na URL (`cgi=`), então sobrevive a recarregar a página e pode ser compartilhada com outro analista junto com o resto do recorte. O split-view herda esse mesmo filtro.
 
-## 6.9. Telefones
+> **Nota de contabilidade**: eventos descartados pelo filtro não entram no aviso de "registros fora da plotagem". Aquele aviso é reservado a evidência que se perdeu por falta de ERB resolvida — misturar as duas coisas produziria alarme falso.
 
-O painel `Telefones` é o ponto de entrada para tudo que envolve números.
+#### 3.4.3 Playback temporal
 
-**Inventário** — todos os números do caso, não só os mais relevantes. Você pode buscar por número, apelido, vínculo ou UF; ordenar por relevância, volume, contatos, aparelhos ou período; e filtrar por recortes de triagem (alvos declarados, números com mais de um aparelho, números presentes em mais de um extrato, já identificados ou ainda sem identificação).
+Controle de reprodução cumulativa: o usuário seleciona um intervalo e vê os eventos aparecendo no mapa progressivamente, como uma linha do tempo animada. O breadcrumb e a trajetória se atualizam juntos.
 
-**Identificação** — qualquer número pode ser batizado com apelido, vínculo, observação e cor. A partir daí o apelido aparece nas tabelas, no grafo, no Gantt, nos popups do mapa e nos arquivos exportados. O número cru continua ao lado, porque é ele que casa com o extrato oficial.
+#### 3.4.4 Detecção de anomalias no mapa
 
-**Qualidade dos dados** — MSISDNs válidos e problemáticos, DDDs faltantes ou inconsistentes, alvos inferidos, alertas de importação, IMEIs compartilhados, duplicatas entre extratos e relações entre números e aparelhos.
+O painel de anomalias do mapa identifica saltos de velocidade implausível entre eventos consecutivos. Se o Google Distance Matrix estiver configurado, o usuário pode verificar o tempo real de percurso por rota viável.
 
-**Sinais do caso** — achados que valem para a investigação inteira: trocas de aparelho, chips que passaram pelo mesmo aparelho, possíveis descartáveis e intermediários (quem está no caminho entre grupos que não se falam diretamente).
+### 3.5 Marcadores analíticos (POIs)
 
-## 6.10. Voz
+POIs enriquecem a investigação com locais conhecidos. No mapa cada um aparece como um **farol tático**: o tipo escolhido no cadastro define a cor e o ícone do distintivo, e o nome fica escrito ao lado do marcador — dá para ler o mapa sem abrir popup nenhum.
 
-O módulo `Voz` foca no comportamento de chamadas. Ele destaca, entre outros:
+##### Símbolo por tipo
 
-- contrapartes recorrentes;
-- reciprocidade;
-- hit de ERBs;
-- swaps de IMEI e de chip;
-- silêncios;
-- bursts;
-- co-localização;
-- comportamento temporal e espacial do alvo.
+Cada um dos 13 tipos ([1.5](#15-poi--point-of-interest)) tem símbolo e cor próprios, para o analista distinguir os pontos à distância sem clicar em nada:
 
-## 6.11. Conexão
+| Tipo | Símbolo | Tipo | Símbolo |
+|---|---|---|---|
+| Local do crime | triângulo de alerta | Empresa / Trabalho | maleta |
+| Ponto de tráfico | caixa/pacote | Loja / Comércio | vitrine com toldo |
+| Encontro | duas pessoas | Escola / Faculdade | capelo |
+| Casa / Residência | casa | Hospital / Saúde | cruz |
+| Apartamento / Condomínio | prédio | Base operacional | escudo |
+| Hotel / Motel | cama | Presídio | cadeado |
+| Outros | pin genérico | | |
 
-O módulo `Conexão` foca nas sessões de dados. Ele ajuda a responder perguntas como:
+O **símbolo é o discriminador principal** e a cor é secundária: dois tipos podem ter matizes próximos, mas nunca o mesmo desenho. A legenda do mapa lista apenas os tipos que o caso realmente usa.
 
-- quantas sessões ocorreram;
-- quais IMEIs apareceram;
-- quais IPs foram usados;
-- quais CGIs estiveram presentes;
-- qual foi o volume de bytes e a duração das sessões;
-- em que janelas ocorreu o pico de atividade de dados.
+O mesmo desenho aparece nos dois engines (Leaflet e Google) e também no mapa HTML offline exportado, porque todos leem o mesmo catálogo.
 
-## 6.12. Dossiê do número e comparação
+Tipos cadastrados antes desta versão continuam válidos — nenhum POI precisa ser recadastrado.
 
-### Dossiê do número
+O usuário pode:
+- cadastrar por coordenadas ou endereço;
+- usar autocomplete do Google Places para preenchimento automático;
+- definir raio de abrangência;
+- visualizar hits no raio (voz, conexão, total);
+- ver dias fortes, horários fortes, ERBs/CGIs dominantes;
+- obter sugestão assistida de **residência** e **trabalho** com base no padrão de permanência;
+- persistir classificação e observações.
 
-Clicando em `Dossiê` em qualquer linha, você abre a ficha completa daquele número: contrapartes com duração média e mediana, separação entre SMS e voz, aparelhos, células e as estações físicas por trás delas, padrão semanal, picos de atividade, silêncios, redirecionamentos, coincidências de local, pernoite, afastamento da base, deslocamentos improváveis e pontos de interesse.
+### 3.6 Painel Telefones
 
-Todos esses indicadores enxergam exatamente a mesma janela de tempo — o que importa quando o resultado vai para um relatório.
+A tela `Telefones` é o ponto de entrada para tudo que envolve números. Ela reúne:
 
-Atenção à coluna `Torre` na tabela de células: três CGIs diferentes podem ser três setores da mesma antena. Sem essa coluna, a tabela sugere três lugares onde há um só.
+**Inventário pesquisável** — todos os números que aparecem no caso, não só os mais relevantes:
+- busca por número, apelido, vínculo ou UF;
+- ordenação por relevância, eventos, contatos, aparelhos, extratos, período ou apelido;
+- paginação;
+- recortes de triagem combináveis: alvos declarados, com mais de um aparelho, presentes em mais de um extrato, já identificados, ainda sem identificação, ou com DDD fora do Plano Nacional de Numeração.
 
-### Comparar dois números
+**Caderno de identificação** — qualquer número pode receber apelido, vínculo (irmão, advogado, fornecedor), observação e cor. O apelido passa a aparecer nas tabelas, no grafo, no Gantt, nos popups do mapa e nos arquivos exportados.
 
-Em `Comparar dois números`, o sistema cruza dois alvos e mostra:
+**Qualidade dos dados**:
+- score de confiança explicável para cada MSISDN/IMEI/IMSI;
+- IMEIs compartilhados (mesmo aparelho, chips diferentes);
+- DDDs e estados;
+- contrapartes mais recorrentes;
+- duplicatas entre extratos;
+- alertas trazidos da importação (números parciais, alvos ambíguos, dados incompletos).
 
-- **contatos em comum**, com quantas chamadas cada lado fez para cada um;
-- **lugares em comum**, pelas estações físicas que os dois usaram;
-- **no mesmo lugar ao mesmo tempo** — lugar em comum é indício fraco; lugar em comum dentro de uma janela curta é o achado;
-- **contato direto** entre eles, com volume, duração e direção;
-- **rotina parecida**, em porcentagem. Compara o formato do horário, não o volume: dois números com a mesma rotina e volumes muito diferentes saem parecidos.
+**Sinais do caso** — achados que valem para a investigação inteira, não para um número: trocas de aparelho, chips que passaram pelo mesmo aparelho, possíveis descartáveis e intermediários (quem está no caminho entre grupos que não se falam diretamente).
 
-## 6.13. Grafo
+### 3.6.1 Dossiê do número
 
-O `Grafo` exibe a rede de relacionamentos do caso. Você pode trabalhar com:
+Em `/telefones/:msisdn`, a ficha completa de um número num único recorte temporal — o que importa quando o resultado vai para um relatório, porque todos os indicadores enxergam exatamente a mesma janela.
 
-- grafo completo;
-- ego-grafo por MSISDN focal;
-- profundidade de hops.
+Reúne: contrapartes (com duração média e mediana, split SMS contra voz, primeiro e último contato), reciprocidade, aparelhos, células e as estações físicas por trás delas, calendário 7×24, picos de atividade, silêncios, redirecionamentos, trocas de aparelho e de chip, sinal de descartável, coincidências de local, pernoite, afastamento da base, deslocamentos improváveis, POIs e linha do tempo.
 
-É especialmente útil para identificar conectores, intermediários e clusters de relacionamento.
+O campo `Torre` na tabela de células é o que impede o erro mais comum de leitura: três CGIs distintos podem ser três setores da mesma antena, ou seja, um lugar só e não três.
 
-## 6.14. Correlação
+### 3.6.2 Comparar dois números
 
-O módulo `Correlação` cruza extratos em busca de elementos compartilhados, como:
+Em `/telefones/comparar`, o cruzamento entre dois alvos — diferente da correlação, que cruza *extratos*:
+- contatos em comum, com o peso de cada lado;
+- estações físicas que os dois usaram;
+- coincidências de local dentro de uma janela de tempo (lugar em comum é fraco; lugar em comum na mesma janela é o indício);
+- contato direto entre eles, com volume, duração e direção;
+- similaridade de rotina, pelo cosseno entre os calendários 7×24. Mede o *formato* do horário e não o volume: dois números com a mesma rotina e volumes muito diferentes saem parecidos.
 
+### 3.7 Análise de Voz
+
+A tela `Voz` analisa chamadas do alvo. Funcionalidades:
+- resumo de chamadas (total, dia, hora, duração, operadora);
+- top contrapartes e chamadas recorrentes;
+- análise de reciprocidade (A liga para B e B liga para A);
+- análise de silêncios e bursts;
+- detecção de troca de IMEI;
+- cadeias de redirecionamento;
+- Cruzamento com POIs e ERBs.
+
+### 3.8 Análise de Conexão
+
+A tela `Conexão` analisa sessões de dados:
+- total de sessões, bytes e duração;
+- top CGIs, IMEIs, IPs e operadoras;
+- padrões de permanência e deslocamento;
+- heatmap de uso e trajetória;
+- cruzamento com POIs.
+
+### 3.9 Análise Avançada (removida)
+
+A tela `Avançado` **não existe mais**. Ela misturava dois tipos de coisa: indicadores de um número e indicadores do caso. Cada metade foi para onde faz sentido:
+
+| O que era | Onde está agora |
+|---|---|
+| Colocalização, velocidade implausível, bursts, silêncios, roaming, dormitório, redirecionamentos, calendário | Dossiê do número (`/telefones/:msisdn`) |
+| Troca de IMEI/chip, burner phones, intermediários | Sinais do caso (`/telefones`) |
+| Stay points | Painel de permanência no mapa |
+
+Links antigos para `/cases/:caseId/advanced` continuam funcionando: redirecionam para `/telefones`, ou direto para o dossiê quando a URL trazia `msisdn=`.
+
+### 3.10 Gantt
+
+A visualização `Gantt` mostra uma linha do tempo dos eventos, organizada por dia e tipo. Permite navegar cronologicamente e retornar ao mapa mantendo a mesma janela temporal selecionada.
+
+### 3.11 Split-view
+
+Permite comparar dois extratos lado a lado no mesmo enquadramento cartográfico. Útil para verificar o mesmo período de dois chips ou aparelhos, com pan e zoom sincronizados.
+
+### 3.12 Grafo
+
+A tela `Grafo` desenha a rede de relacionamentos do alvo:
+- nós = MSISDNs;
+- arestas = chamadas, mensagens ou eventos compartilhados;
+- ego-grafo: foca em um número e mostra seus vizinhos até uma profundidade configurável.
+
+### 3.13 Correlação
+
+Cruza extratos de casos diferentes ou do mesmo caso para encontrar:
 - MSISDNs em comum;
-- IMEIs em comum;
-- CGIs em comum;
-- sobreposição temporal compatível.
+- IMEIs compartilhados;
+- CGIs comuns;
+- sobreposição temporal de eventos.
 
-Use esta tela quando houver mais de um extrato relevante e você precisar provar convergência entre fontes diferentes.
+### 3.14 Exportações
 
-## 6.15. Exportações
+O usuário pode exportar os dados e relatórios em vários formatos:
 
-O módulo `Exportações` gera saídas para auditoria, compartilhamento ou entrega final. O pacote atual pode gerar:
+- `calls.csv` / `conns.csv`: registros canônicos de voz e conexão.
+- `pois.csv`: resumo analítico dos POIs. Traz o tipo em duas colunas — `kind` (identificador técnico, estável) e `kind_label` (rótulo legível, ex.: "Hotel / Motel") —, o mesmo valendo para a sugestão automática (`suggested_kind` / `suggested_kind_label`).
+- `all.xlsx`: planilha com abas canônicas e resumo de POIs.
+- `markers.kml`: marcadores cartográficos para ferramentas externas (Google Earth, etc.).
+- `report.pdf` / `report.html`: relatório completo com resumo, analytics, POIs e mapa estático opcional.
+- `map.html`: mapa tático standalone interativo, com Leaflet embutido, marcadores, heatmap, trajetória, POIs (mesmo farol tático da aplicação) e playback — funciona offline sem backend.
 
-- `calls.csv`;
-- `conns.csv`;
-- `pois.csv`;
-- `all.xlsx`;
-- `markers.kml`;
-- `report.pdf`;
-- `report.html`;
-- `map.html`.
+- `case.zip`: o caso inteiro (manifesto, trilha, `raw` e parquet de cada extrato) com um `SHA256SUMS.txt`. Quem recebe confere com `sha256sum -c SHA256SUMS.txt`, sem precisar desta ferramenta, ou instala com *Importar caso (.zip)* (ver 3.1).
 
-O `report.html` pode ser protegido por senha. Alguns formatos usam `MSISDN alvo` para enriquecer a análise.
+O `report.html` pode ser gerado com proteção por senha (WebCrypto), e o `map.html` é uma página única portátil para anexar em relatórios ou compartilhar. O `map.html` sai com o recorte que está na tela: filtros, alvo e extratos ligados.
 
-O `map.html` gera um mapa standalone interativo com Leaflet embutido, marcadores, heatmap, trajetória, POIs, timeline e playback temporal cumulativo. O arquivo funciona offline em qualquer navegador, sem necessidade de backend ou código.
+**Integridade.** Toda exportação é registrada na trilha de auditoria (`data/audit/system.jsonl`) com o SHA-256 do arquivo gerado. O mesmo hash vem no cabeçalho `X-Content-SHA256` da resposta. A trilha é encadeada por HMAC e pode ser conferida com `python scripts\verify_audit.py` ou em `GET /api/v1/audit/verify`. O resultado é um de três:
+- `ok`: a trilha está íntegra;
+- `partial`: há um trecho inicial gravado antes de a trilha ser assinada, ou assinado com uma chave de admin anterior (use `--old-key` para conferi-lo);
+- `broken`: há linha editada, removida, inserida ou fora de ordem.
 
-## 6.16. Base ERBs
+### 3.15 Análise GPS (módulo independente)
 
-### O que a tela faz
+Para relatórios de rastreador veicular, com casos próprios em `data/gps_cases`, separados dos extratos de operadora:
+- **Importação:** aceita `.xls`, `.xlsx` e `.csv` com as colunas essenciais data, latitude e longitude. Arquivos grandes são processados em segundo plano, e a placa e o ID do dispositivo são tirados do título do relatório quando existem.
+- **Mapa:** em Leaflet ou Google, mostra pontos, trajeto, playback, calor e permanências, com filtros por período, velocidade mínima, ignição e track.
+- **POIs:** têm raio e o mesmo farol do mapa de ERBs, e cada um traz o resumo de presença: hits, dias e janela de horário.
+- **Detecções:** permanências e saltos de velocidade implausível.
+- **Exportações:** `positions.csv`, `poi_summary.csv`, `track.kml`, `all.xlsx` e `report.html`.
 
-O módulo `Base ERBs` administra a base mestre de estações: o cadastro de antenas de TIM, VIVO e CLARO que a instalação usa como referência cartográfica. Ele permite:
+---
 
-- buscar por operadora, UF, cidade, bairro e estação;
-- editar registros;
-- criar registros manuais;
-- importar atualização por planilha `.xlsx` ou arquivo `.csv`;
-- revisar staging e diff antes de aplicar;
-- executar commit e rollback de versões;
-- consultar histórico da base.
+## 4. Tipos de mapas e engines
 
-É uma área sensível. Só altere essa base com critério documental.
+### 4.1 Leaflet
 
-### Como atualizar a base de ERBs
+- Engine padrão e offline.
+- Camadas: OpenStreetMap padrão, OpenStreetMap Humanitarian, Esri World Imagery (satélite) e CartoDB Dark Matter.
+- Tema escuro e claro.
+- Funciona sem API key e sem conexão após carregamento inicial.
 
-A base é atualizada pela própria interface do aplicativo. Não é necessário receber um executável novo nem reinstalar nada. O procedimento exige a chave de administrador descrita na seção 5.2.
+### 4.2 Google Maps
 
-1. Abra o `erbs_analyzer_server.exe` e aguarde a interface no navegador.
-2. Clique em `Acesso admin` e instale a chave, caso ainda não tenha feito isso neste navegador.
-3. Entre no módulo `Base ERBs`.
-4. Envie a planilha da base nova no campo de importação.
-5. Aguarde a conversão. Uma planilha de cerca de 108 mil estações leva por volta de 20 segundos.
-6. Revise o diff apresentado: quantas estações entraram, quantas saíram e quantas mudaram.
-7. Preencha uma `tag` que identifique a versão, por exemplo `julho2026`.
-8. Confirme o commit.
+- Engine opcional, ativada via `API Key` e `Map ID` na configuração.
+- Modos: `roadmap`, `satellite`, `hybrid`, `terrain`.
+- Habilita recursos extras: Places autocomplete, Geocoding, Geolocation, Maps Static e Distance Matrix.
+- Se a SDK não carregar, o sistema faz fallback automático para Leaflet.
 
-### Formato aceito
+---
 
-Planilha `.xlsx` com os dados na primeira aba e uma linha de cabeçalho contendo estas doze colunas, exatamente com estes nomes:
+## 5. Configuração e operação
 
-`Número Estação`, `Operadora`, `SiglaUf`, `MUN`, `Bairro`, `Logradouro`, `Latitude`, `Longitude`, `IBGE`, `ClassInfraFisica`, `Tecs`, `Faixa`.
+### 5.1 Configuração do Google Maps
 
-Também é aceito arquivo `.csv` com separador `;`, sem linha de cabeçalho, com as colunas na mesma ordem acima.
+Através da interface, o usuário informa `API Key` e `Map ID` do Google Cloud. A configuração é salva em `data/config/app_settings.json` e não exige rebuild do executável.
 
-Se faltar qualquer uma das colunas, a importação é recusada e a base atual permanece intacta. São carregadas apenas as estações de TIM, VIVO e CLARO; linhas de outras operadoras são ignoradas.
+### 5.2 Modo protegido
 
-### Resultado esperado
+A ferramenta suporta modo protegido via `ERBS_ADMIN_API_KEY`. Quando ativado, operações administrativas (criar, excluir, restaurar e importar casos; alterar base ERB; importar dados) exigem a chave no header. Eventos de acesso e negação são registrados em `data/audit/system.jsonl`.
 
-- a base ativa passa a ser a versão nova, identificada pela `tag` informada;
-- a versão anterior é arquivada automaticamente, permitindo rollback;
-- a mudança vale imediatamente, sem reiniciar o executável;
-- o total de estações e a versão vigente aparecem no topo da tela.
+No painel `Acesso admin`, a chave é instalada uma única vez por navegador e permanece válida nas sessões seguintes — não é preciso digitá-la a cada abertura do aplicativo. Ela só deixa de valer quando removida no botão `Remover chave` do próprio painel (ou quando os dados do site são limpos), e nesse caso precisa ser instalada novamente.
 
-### O que a atualização muda, e o que não muda
+### 5.3 Cache de APIs
 
-Muda:
+As respostas pagas do Google são cacheadas em disco para reduzir custos e repetir consultas. O tempo de vida do cache é configurável (padrão 30 dias).
 
-- a busca e o cadastro de estações dentro do próprio módulo `Base ERBs`;
-- o raio dos círculos de cobertura estimada, que deriva da faixa licenciada da estação;
-- o cadastro herdado pelos CGIs que ainda não tinham estação associada.
+---
 
-Não muda:
+## 6. Para que serve cada análise na prática
 
-- a posição dos pontos que já aparecem no mapa dos casos importados. Essas coordenadas vêm do extrato entregue pela operadora, não da base mestre, e permanecem como estão. Atualizar a base mestre não desloca nem corrige marcador de caso já importado.
+| Análise | Quando usar | O que responde |
+|---|---|---|
+| **Mapa tático** | Visualização geral e apresentação | Onde o alvo esteve, quando e com quem. |
+| **Heatmap** | Identificar áreas de concentração | Onde o alvo passou mais tempo. |
+| **Breadcrumb** | Reconstruir trajeto | Qual foi a sequência de locais no tempo. |
+| **Geofence** | Verificar presença em endereço | O alvo entrou nessa área? Quando e por quanto tempo? |
+| **Corredor** | Confirmar rota | O alvo passou por essa via? |
+| **Stay points** | Descobrir endereço de moradia/trabalho | Onde o alvo parou por muito tempo? |
+| **Colocalização** | Encontrar companheiros/cúmplices | Quem estava na mesma torre no mesmo horário? |
+| **Velocidade implausível** | Validar dados | Existe deslocamento fisicamente impossível? |
+| **Burner phones** | Detectar números descartáveis | Existe aparelho usado por poucos dias e poucos contatos? |
+| **Bursts** | Detectar momentos de crise | Houve pico de comunicação em curto prazo? |
+| **Silêncios** | Identificar desligamento/mudança | Quando o aparelho parou de eventar? |
+| **Troca de IMEI/Chip** | Rastrear dispositivo e SIM | O mesmo chip mudou de aparelho? O mesmo aparelho mudou de chip? |
+| **Chamadas redirecionadas** | Entender ocultação | A ligação foi encaminhada para onde? |
+| **Correlação** | Cruzar extratos | Dois alvos se encontram? Compartilham aparelho ou torre? |
+| **Grafo** | Visualizar rede | Quem é o elo mais forte do alvo? |
+| **Resumo de POI** | Medir proximidade com locais de interesse | Quantos eventos ocorreram perto da casa do suspeito? |
+| **Filtro por CGI** | Isolar uma antena específica | O que aconteceu nesta célula, e só nela? Em que horários ela foi usada? |
 
-### Como voltar para a versão anterior
+---
 
-Na mesma tela, no histórico de versões, escolha a versão desejada e execute o rollback. O estado atual também é arquivado antes da restauração, então é possível ir e voltar entre versões.
+## 7. Considerações de uso e limitações
 
-### Cuidados
+1. **A ferramenta é local**: os dados são processados e armazenados na máquina do usuário. Não há envio obrigatório para a nuvem, exceto quando APIs do Google estão ativadas.
+2. **Google Maps é opcional**: sem API key, o Leaflet atende todo o mapa e a maioria das análises espaciais.
+3. **Precisão de localização**: a posição estimada depende da qualidade da base ERB e das coordenadas do extrato. O azimute e a distância real podem variar.
+4. **Velocidade implausível**: o limite é configurável. Resultados devem ser verificados com contexto (transporte, erro de CGI, etc.).
+5. **Colocalização**: presença na mesma célula não prova proximidade física — células rurais podem ter quilômetros de alcance. Use como indício.
+6. **Burner phone**: as regras são heurísticas. Devem ser combinadas com outros indícios.
+7. **Filtro por CGI**: filtrar por uma célula não é o mesmo que filtrar por um endereço. O CGI diz qual antena atendeu o aparelho, e o alcance dessa antena pode ser de centenas de metros em área urbana ou de quilômetros em área rural. Além disso, boa parte das células de um caso costuma não ter coordenada resolvida na base — elas aparecem na lista, mas não plotam.
+8. **Tipo de POI**: a classificação é do analista, não do sistema. As sugestões automáticas cobrem apenas residência e trabalho; os demais tipos são atribuídos manualmente e valem como anotação, não como conclusão.
 
-- a pasta da instalação precisa ter permissão de escrita, porque a importação grava arquivos temporários em `data\erb_db`. Evite instalar o pacote em `C:\Program Files`;
-- guarde a planilha de origem junto da documentação do trabalho, para rastreabilidade;
-- ao substituir o executável por uma versão nova, preserve a pasta `data` para não perder a base já carregada.
+---
 
-## 7. Como habilitar o Google Maps na instalação
+## 8. Resumo
 
-O Google Maps é opcional. O aplicativo funciona integralmente com `Leaflet`, mas você pode habilitar o Google para usar a engine alternativa e, se desejar, geocodificação por endereço.
-
-## 7.1. O que você precisa no Google Cloud
-
-Antes de salvar a chave no aplicativo, prepare o projeto no Google Cloud:
-
-1. crie ou escolha um projeto;
-2. ative o billing do projeto;
-3. habilite a `Maps JavaScript API`;
-4. se quiser geocodificação por endereço dentro da ferramenta, habilite também a `Geocoding API`;
-5. crie uma `API Key`;
-6. opcionalmente, crie um `Map ID` se quiser estilo personalizado;
-7. restrinja a chave por API e, depois de validar o funcionamento, restrinja também o uso conforme a política da sua organização.
-
-### Recomendação prática de segurança
-
-- habilite somente as APIs realmente necessárias;
-- teste primeiro com restrições mínimas e endureça depois;
-- não distribua a pasta do executável com uma chave real sem antes restringi-la;
-- trate `data\config\app_settings.json` como arquivo sensível quando houver uma chave Google válida gravada.
-
-## 7.2. Como salvar a chave no aplicativo
-
-1. Abra um caso.
-2. Entre em `Mapa ERBs`.
-3. Abra a seção `Engine e basemap`.
-4. Clique em `Configurar Google`.
-5. Preencha:
-   - `API Key`: obrigatória.
-   - `Map ID`: opcional.
-6. Salve a configuração.
-
-Resultado esperado:
-
-- a instalação passa a reconhecer o Google Maps;
-- a engine Google fica disponível para uso no mapa;
-- a configuração é reaproveitada nessa mesma instalação;
-- não é necessário rebuild do executável.
-
-## 7.3. Onde a configuração é gravada
-
-A configuração runtime do Google Maps é salva em:
-
-`data\config\app_settings.json`
-
-Isso significa que:
-
-- a chave é local daquela instalação;
-- navegadores diferentes na mesma máquina continuam usando a configuração salva;
-- se você copiar a pasta inteira com `data`, leva junto essa configuração.
-
-## 7.4. Como remover a configuração do Google
-
-Na mesma área `Engine e basemap`, use a opção de limpar ou remover a configuração do Google Maps.
-
-Quando isso acontece:
-
-- a chave local é apagada;
-- o sistema volta para `Leaflet`;
-- o restante da ferramenta continua funcionando normalmente.
-
-## 7.5. Erros comuns do Google Maps
-
-Se o Google não carregar, verifique:
-
-- billing ativo no Google Cloud;
-- `Maps JavaScript API` habilitada;
-- `Geocoding API` habilitada, se você for usar busca por endereço;
-- chave correta;
-- restrições compatíveis com o seu ambiente local;
-- conectividade da máquina;
-- `Map ID` correto, se você informou um.
-
-Mensagens de falha normalmente estão ligadas a:
-
-- chave ausente ou inválida;
-- billing desativado;
-- restrição de chave incompatível;
-- falta de conectividade;
-- falha ao carregar a SDK do Google Maps.
-
-## 8. Segurança e boas práticas
-
-### 8.1. Segurança local
-
-O executável foi desenhado para uso local. Por padrão:
-
-- o servidor sobe em `127.0.0.1`;
-- os dados ficam na pasta `data` da própria instalação;
-- a aplicação não depende de um backend remoto do produto;
-- a trilha de auditoria fica em arquivo local.
-
-### 8.2. O que proteger
-
-Proteja especialmente:
-
-- `data\cases`, porque contém extratos e resultados da análise;
-- `data\config\app_settings.json`, se houver chave Google Maps válida;
-- `data\audit\system.jsonl`, porque registra eventos operacionais;
-- exportações geradas para compartilhamento externo.
-
-### 8.3. Modo protegido
-
-No primeiro uso, a instalação cria `data\config\admin_key`. Operações sensíveis exigem essa credencial. O painel `Acesso admin` instala a chave uma única vez no navegador e a mantém válida nas sessões seguintes, até você removê-la em `Remover chave`. A chave Google salva no aplicativo fica cifrada no JSON de configuração.
-
-### 8.4. Boas práticas de uso
-
-- mantenha o pacote em pasta local confiável;
-- não execute o aplicativo de dentro do `.zip`;
-- não compartilhe a pasta `data` sem revisar o conteúdo;
-- revise filtros e alvo antes de exportar evidências;
-- remova ou restrinja a chave Google antes de distribuir a instalação a terceiros;
-- preserve a pasta `data` quando atualizar o pacote para nova versão.
-
-## 9. Problemas comuns
-
-### 9.1. O navegador abriu, mas a tela ficou em branco
-
-Faça esta sequência:
-
-1. feche o navegador;
-2. feche o executável;
-3. abra o executável novamente;
-4. confirme que `erbs_analyzer_server.exe`, `_internal` e `data` continuam juntos;
-5. tente abrir manualmente a URL mostrada na janela do executável.
-
-### 9.2. O mapa não mostra pontos
-
-Verifique:
-
-- se existem extratos ativos no caso;
-- se há filtro excessivo ligado;
-- se os eventos possuem ERB válida;
-- se muitos registros foram ocultados por CGI insuficiente ou coordenada inválida.
-
-### 9.3. O Google Maps não habilita
-
-Verifique:
-
-- se a chave foi salva corretamente;
-- se o billing está ativo;
-- se a API foi habilitada no Google Cloud;
-- se a internet da máquina está funcionando;
-- se a chave está restrita de forma compatível com o uso local.
-
-### 9.4. O executável abre, mas a interface não carrega
-
-- aguarde alguns segundos;
-- veja a URL mostrada na janela do executável;
-- tente abrir essa URL manualmente;
-- confira se algum antivírus ou política local está bloqueando a execução;
-- verifique se a porta local está ocupada por outro processo.
-
-### 9.5. A geocodificação por endereço falha
-
-Na maior parte dos casos, o problema é um destes:
-
-- Google Maps não configurado na instalação;
-- `Geocoding API` não habilitada no projeto do Google;
-- falta de internet;
-- erro de quota, billing ou restrição da chave.
-
-Se necessário, use coordenadas manuais para não interromper o fluxo investigativo.
-
-### 9.6. Atualizei a base de ERBs e o mapa do caso não mudou
-
-Esse é o comportamento esperado. A posição dos eventos de um caso vem do extrato entregue pela operadora, não da base mestre. A base mestre alimenta a busca de estações, o cadastro herdado por CGI e o raio de cobertura estimada, e não a posição dos eventos já importados.
-
-Se a expectativa era ver as estações novas, confira no topo da tela `Base ERBs` se a versão vigente é a que você acabou de commitar.
-
-## 10. O que informar ao suporte ou ao time de testes
-
-Se precisar relatar erro, envie:
-
-- o que estava fazendo;
-- nome do módulo aberto;
-- horário aproximado;
-- print da tela;
-- mensagem exibida no navegador ou na janela do executável;
-- se o Google Maps estava ativo ou não;
-- se havia filtro temporal, de cidade ou de operadora ligado;
-- se o problema aconteceu com um extrato específico.
-
-## 11. Resumo final
-
-O `ERBs Analyzer` foi desenhado para que o usuário do executável consiga:
-
-- criar casos;
-- importar extratos;
-- validar o contexto espacial no mapa;
-- comparar extratos no split-view;
-- ler a linha do tempo no Gantt;
-- investigar qualidade de números em `Telefones`;
-- aprofundar em `Voz`, `Conexão` e no dossiê do número;
-- mapear relacionamentos no `Grafo`;
-- cruzar fontes em `Correlação`;
-- gerar evidências em `Exportações`;
-- opcionalmente habilitar o Google Maps sem rebuild do executável.
-
-Se estiver em dúvida, siga esta sequência curta:
-
-1. instalar a chave de administrador (seção 5.2), se ainda não estiver com `Admin ativo`;
-2. abrir ou criar um caso;
-3. importar um extrato `.xlsx`;
-4. validar o caso no mapa;
-5. aprofundar em `Telefones`, no dossiê do número, `Gantt` e `Voz`;
-6. cruzar em `Grafo` e `Correlação`;
-7. exportar quando os filtros e o alvo estiverem estáveis.
+O ERBs Analyzer v2 oferece um ambiente completo para transformar extratos telefônicos em informações investigativas. Do upload à exportação, passando por mapa tático, análises comportamentais, alertas e relatórios, cada funcionalidade foi pensada para ajudar a responder perguntas como **onde**, **quando**, **com quem** e **como** o alvo se comunicou.
